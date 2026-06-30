@@ -1,0 +1,2698 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>粉絲團監測站</title>
+<link rel="icon" href="data:,">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; }
+  #root { min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/plain" id="app-source">
+const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+/* ============================================================
+   粉絲團監測站 — 資料模型
+   - pages: [{id, name, category, url}]
+   - fanRecords: { [pageId]: [{id, date, count}] }   // 每月可多筆，各自綁日期
+   - posts: [{id, pageId, url, likes, comments, shares, type, date, month}]
+   ============================================================ */
+
+const STORAGE_KEYS = {
+  PAGES: "fbmonitor:pages",
+  FAN_RECORDS: "fbmonitor:fanrecords",
+  POSTS: "fbmonitor:posts",
+};
+
+const POST_TYPES = [
+  { value: "static", label: "靜態貼文", icon: "image" },
+  { value: "video", label: "影片", icon: "video" },
+  { value: "reel", label: "Reels", icon: "reel" },
+  { value: "other", label: "其他", icon: "dot" },
+];
+
+function nowMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(m) {
+  const [y, mo] = m.split("-");
+  return `${y}年${parseInt(mo)}月`;
+}
+
+function shiftMonth(m, delta) {
+  const [y, mo] = m.split("-").map(Number);
+  const d = new Date(y, mo - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+
+function engagement(p) {
+  return (p.likes || 0) + (p.comments || 0) + (p.shares || 0);
+}
+
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// entries belonging to a given "YYYY-MM" month, sorted by date ascending
+function entriesInMonth(records, pageId, month) {
+  return (records[pageId] || [])
+    .filter((r) => (r.date || "").slice(0, 7) === month)
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+}
+
+// latest entry for a page within a month (used for month-over-month growth)
+function latestInMonth(records, pageId, month) {
+  const entries = entriesInMonth(records, pageId, month);
+  return entries.length ? entries[entries.length - 1] : null;
+}
+
+/* ---------------- Icons (inline SVG, line style, matches established preference) ---------------- */
+const Icon = ({ name, size = 16, className = "" }) => {
+  const props = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.5,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    className,
+  };
+  switch (name) {
+    case "plus":
+      return <svg {...props}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>;
+    case "trash":
+      return <svg {...props}><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1.5 14a2 2 0 0 1-2 2H8.5a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></svg>;
+    case "list":
+      return <svg {...props}><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><circle cx="3.5" cy="6" r="1" /><circle cx="3.5" cy="12" r="1" /><circle cx="3.5" cy="18" r="1" /></svg>;
+    case "chart":
+      return <svg {...props}><line x1="4" y1="20" x2="4" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="20" y1="20" x2="20" y2="14" /><line x1="2" y1="20" x2="22" y2="20" /></svg>;
+    case "trend":
+      return <svg {...props}><polyline points="3 17 9 11 13 15 21 7" /><polyline points="15 7 21 7 21 13" /></svg>;
+    case "users":
+      return <svg {...props}><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><circle cx="17" cy="9" r="2.3" /><path d="M21 20c0-2.6-1.7-4.8-4-5.6" /></svg>;
+    case "heart":
+      return <svg {...props}><path d="M12 20s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 5c-2.5 4.5-9.5 9-9.5 9z" /></svg>;
+    case "spark":
+      return <svg {...props}><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.5 5.5l2.8 2.8M15.7 15.7l2.8 2.8M5.5 18.5l2.8-2.8M15.7 8.3l2.8-2.8" /></svg>;
+    case "image":
+      return <svg {...props}><rect x="3" y="4" width="18" height="16" rx="1.5" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M21 16l-5-5-4 4-2-2-6 6" /></svg>;
+    case "video":
+      return <svg {...props}><rect x="2.5" y="5.5" width="13" height="13" rx="1.5" /><path d="M15.5 9.5l6-3.5v12l-6-3.5" /></svg>;
+    case "reel":
+      return <svg {...props}><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 3v4M16 3v4M3 9h18" /><path d="M10 13l4 2-4 2v-4z" /></svg>;
+    case "dot":
+      return <svg {...props}><circle cx="12" cy="12" r="2" /></svg>;
+    case "download":
+      return <svg {...props}><path d="M12 3v12" /><polyline points="7 11 12 16 17 11" /><path d="M4 19h16" /></svg>;
+    case "chevronLeft":
+      return <svg {...props}><polyline points="14 5 7 12 14 19" /></svg>;
+    case "chevronRight":
+      return <svg {...props}><polyline points="10 5 17 12 10 19" /></svg>;
+    case "link":
+      return <svg {...props}><path d="M9.5 14.5l5-5" /><path d="M8 17l-2.5 2.5a3.5 3.5 0 0 1-5-5L3 12" /><path d="M16 7l2.5-2.5a3.5 3.5 0 0 1 5 5L21 12" /></svg>;
+    case "edit":
+      return <svg {...props}><path d="M16.5 3.5a2 2 0 0 1 2.8 2.8L7 18.6 3 20l1.4-4L16.5 3.5z" /></svg>;
+    case "x":
+      return <svg {...props}><line x1="5" y1="5" x2="19" y2="19" /><line x1="19" y1="5" x2="5" y2="19" /></svg>;
+    case "save":
+      return <svg {...props}><path d="M5 4h11l3 3v13H5z" /><path d="M8 4v5h8V4M8 13h8v7H8z" /></svg>;
+    case "search":
+      return <svg {...props}><circle cx="10.5" cy="10.5" r="6.5" /><line x1="15.5" y1="15.5" x2="20.5" y2="20.5" /></svg>;
+    case "crown":
+      return <svg {...props}><path d="M3 17l2-8 4 4 3-6 3 6 4-4 2 8z" /><line x1="3" y1="20" x2="21" y2="20" /></svg>;
+    default:
+      return null;
+  }
+};
+
+/* ---------------- Persistence hook ----------------
+   Uses browser localStorage so this file works as a standalone page
+   (GitHub Pages, Netlify, or just opened locally) — no Claude.ai dependency.
+   Note: data lives only in this browser/device. Use "匯出 Excel" regularly to back up. */
+function isStorageAvailable() {
+  try {
+    const testKey = "__fbmonitor_test__";
+    localStorage.setItem(testKey, "1");
+    localStorage.removeItem(testKey);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function useStoredState(key, fallback) {
+  const [state, setState] = useState(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (e) {
+      console.error("Failed to read localStorage for", key, e);
+      return fallback;
+    }
+  });
+  const [loaded] = useState(true); // localStorage is synchronous, so data is ready immediately
+
+  const persist = useCallback((value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error("Storage write failed for", key, e);
+    }
+  }, [key]);
+
+  return [state, setState, persist, loaded];
+}
+
+function App() {
+  const [pages, setPages, persistPages, pagesLoaded] = useStoredState(STORAGE_KEYS.PAGES, []);
+  const [fanRecords, setFanRecords, persistFanRecords, frLoaded] = useStoredState(STORAGE_KEYS.FAN_RECORDS, {});
+  const [posts, setPosts, persistPosts, postsLoaded] = useStoredState(STORAGE_KEYS.POSTS, []);
+  const [storageOK] = useState(isStorageAvailable);
+
+  const [view, setView] = useState("input"); // input | report | trend | pages
+  const [month, setMonth] = useState(nowMonth());
+  const [toast, setToast] = useState(null);
+  const allLoaded = pagesLoaded && frLoaded && postsLoaded;
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  }, []);
+
+  const savePages = useCallback((next) => {
+    setPages(next);
+    persistPages(next);
+  }, [persistPages, setPages]);
+
+  const saveFanRecords = useCallback((next) => {
+    setFanRecords(next);
+    persistFanRecords(next);
+  }, [persistFanRecords, setFanRecords]);
+
+  const savePosts = useCallback((next) => {
+    setPosts(next);
+    persistPosts(next);
+  }, [persistPosts, setPosts]);
+
+  const pageMap = useMemo(() => {
+    const m = {};
+    pages.forEach((p) => (m[p.id] = p));
+    return m;
+  }, [pages]);
+
+  if (!allLoaded) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F3F0EA", fontFamily: "'Noto Sans TC', sans-serif", color: "#8A9A8E" }}>
+        讀取中…
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.shell}>
+      <style>{fontImports}</style>
+      <Sidebar view={view} setView={setView} pageCount={pages.length} />
+      <main style={styles.main}>
+        {!storageOK && (
+          <div style={styles.storageWarning}>
+            ⚠ 這個瀏覽器/開啟方式目前無法儲存資料（可能是直接用 file:// 開啟檔案造成的限制）。
+            你輸入的內容暫時只存在這次畫面開著的期間，重新整理或關閉就會消失。
+            建議改用「匯出 Excel」開頭就先備份，或改成透過網址（例如部署到 GitHub Pages）開啟。
+          </div>
+        )}
+        {view === "pages" && (
+          <PagesView
+            pages={pages}
+            savePages={savePages}
+            showToast={showToast}
+            fanRecords={fanRecords}
+            saveFanRecords={saveFanRecords}
+            posts={posts}
+            savePosts={savePosts}
+          />
+        )}
+        {view === "input" && (
+          <InputView
+            pages={pages}
+            posts={posts}
+            savePosts={savePosts}
+            fanRecords={fanRecords}
+            saveFanRecords={saveFanRecords}
+            month={month}
+            setMonth={setMonth}
+            showToast={showToast}
+          />
+        )}
+        {view === "report" && (
+          <ReportView
+            pages={pages}
+            posts={posts}
+            fanRecords={fanRecords}
+            month={month}
+            setMonth={setMonth}
+            showToast={showToast}
+          />
+        )}
+        {view === "trend" && (
+          <TrendView pages={pages} fanRecords={fanRecords} posts={posts} />
+        )}
+      </main>
+      {toast && <div style={styles.toast}>{toast}</div>}
+    </div>
+  );
+}
+
+const fontImports = `
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700&family=Noto+Sans+TC:wght@400;500;700&family=Space+Grotesk:wght@300;400;500&display=swap');
+  * { box-sizing: border-box; }
+  ::selection { background: #B08968; color: #fff; }
+  input, select, textarea { font-family: 'Noto Sans TC', sans-serif; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #8A9A8E; outline-offset: 1px; }
+  button:focus-visible { outline: 2px solid #8A9A8E; outline-offset: 2px; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #D8D2C4; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media (max-width: 1080px) {
+    .fbm-form-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+  @media (max-width: 720px) {
+    .fbm-form-grid { grid-template-columns: 1fr !important; }
+    .fbm-form-grid > * { grid-column: span 1 !important; }
+  }
+`;
+
+/* ============================================================ Sidebar ============================================================ */
+function Sidebar({ view, setView, pageCount }) {
+  const items = [
+    { key: "input", label: "本月輸入", icon: "edit" },
+    { key: "report", label: "月報表", icon: "chart" },
+    { key: "trend", label: "趨勢總覽", icon: "trend" },
+    { key: "pages", label: "粉絲團清單", icon: "list" },
+  ];
+  return (
+    <nav style={styles.sidebar}>
+      <div style={styles.brand}>
+        <div style={styles.brandMark}>粉</div>
+        <div>
+          <div style={styles.brandTitle}>粉絲團監測站</div>
+          <div style={styles.brandSub}>{pageCount} 家追蹤中</div>
+        </div>
+      </div>
+      <div style={styles.navList}>
+        {items.map((it) => (
+          <button
+            key={it.key}
+            onClick={() => setView(it.key)}
+            style={{ ...styles.navItem, ...(view === it.key ? styles.navItemActive : {}) }}
+          >
+            <Icon name={it.icon} size={17} />
+            <span>{it.label}</span>
+          </button>
+        ))}
+      </div>
+      <div style={styles.sidebarFoot}>
+        資料儲存在此瀏覽器本機，
+        <br />建議定期用「匯出 Excel」備份。
+      </div>
+    </nav>
+  );
+}
+
+/* ============================================================ Pages management ============================================================ */
+/* ---------------- Excel import: header fuzzy matching ---------------- */
+const HEADER_HINTS = {
+  name: ["經銷商", "名稱", "粉絲團", "粉絲頁", "page", "name", "品牌"],
+  url: ["網址", "連結", "url", "link", "facebook"],
+  category: ["集團", "法人", "公司", "分類", "category", "group"],
+  region: ["地區", "區域", "region", "area"],
+};
+
+// strip non-breaking spaces and other invisible whitespace that often sneaks in from copy-pasted spreadsheets
+function cleanCell(v) {
+  return String(v ?? "").replace(/[\u00A0\u200B\uFEFF]/g, "").trim();
+}
+
+function matchColumn(headerRow, kind, usedIdx = []) {
+  const hints = HEADER_HINTS[kind];
+  for (let i = 0; i < headerRow.length; i++) {
+    if (usedIdx.includes(i)) continue;
+    const h = cleanCell(headerRow[i]).toLowerCase();
+    if (!h) continue;
+    if (hints.some((hint) => h.includes(hint.toLowerCase()))) return i;
+  }
+  return -1;
+}
+
+function isLikelyUrl(s) {
+  return /^https?:\/\//i.test(cleanCell(s));
+}
+
+// a row counts as a usable header row if at least 2 of its cells match any known hint
+function looksLikeHeaderRow(row) {
+  const allHints = [...HEADER_HINTS.name, ...HEADER_HINTS.url, ...HEADER_HINTS.category, ...HEADER_HINTS.region];
+  let hits = 0;
+  for (const cell of row) {
+    const h = cleanCell(cell).toLowerCase();
+    if (h && allHints.some((hint) => h.includes(hint.toLowerCase()))) hits++;
+  }
+  return hits >= 2;
+}
+
+async function parseImportFile(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const allRows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  if (allRows.length === 0) return { rows: [], warnings: ["檔案是空的"] };
+
+  // skip any leading fully-blank rows, then look for the real header row within the next few rows
+  let headerRowIdx = -1;
+  for (let i = 0; i < Math.min(allRows.length, 10); i++) {
+    const row = allRows[i];
+    const isBlank = row.every((c) => cleanCell(c) === "");
+    if (isBlank) continue;
+    if (looksLikeHeaderRow(row)) {
+      headerRowIdx = i;
+      break;
+    }
+    // first non-blank row that doesn't look like a header — assume it IS the header anyway (best effort)
+    headerRowIdx = i;
+    break;
+  }
+  if (headerRowIdx === -1) headerRowIdx = 0;
+
+  const header = allRows[headerRowIdx];
+  let nameIdx = matchColumn(header, "name");
+  let urlIdx = matchColumn(header, "url", [nameIdx]);
+  let catIdx = matchColumn(header, "category", [nameIdx, urlIdx]);
+  let regionIdx = matchColumn(header, "region", [nameIdx, urlIdx, catIdx]);
+
+  const warnings = [];
+  const dataRows = allRows.slice(headerRowIdx + 1).filter((r) => r.some((c) => cleanCell(c) !== ""));
+
+  // Fallback: if name/url columns weren't found by header text, guess by content of first data row
+  if ((nameIdx === -1 || urlIdx === -1) && dataRows.length > 0) {
+    const sample = dataRows[0];
+    if (urlIdx === -1) {
+      const guess = sample.findIndex((c) => isLikelyUrl(c));
+      if (guess !== -1) urlIdx = guess;
+    }
+    if (nameIdx === -1) {
+      const guess = sample.findIndex((c, i) => i !== urlIdx && i !== catIdx && i !== regionIdx && cleanCell(c) !== "");
+      if (guess !== -1) nameIdx = guess;
+    }
+  }
+
+  if (nameIdx === -1) warnings.push("找不到「名稱」欄位，請確認標題列是否包含類似「名稱」「經銷商」「粉絲團」的字樣");
+  if (urlIdx === -1) warnings.push("找不到「網址」欄位，請確認標題列是否包含類似「網址」「連結」的字樣");
+  if (headerRowIdx > 0) warnings.push(`偵測到標題列前有 ${headerRowIdx} 行空白或說明文字，已自動跳過`);
+
+  const parsed = dataRows.map((r, i) => ({
+    rowNum: headerRowIdx + i + 2, // +2: 1-indexed sheet rows, plus the header row itself
+    name: nameIdx !== -1 ? cleanCell(r[nameIdx]) : "",
+    url: urlIdx !== -1 ? cleanCell(r[urlIdx]) : "",
+    category: catIdx !== -1 ? cleanCell(r[catIdx]) : "",
+    region: regionIdx !== -1 ? cleanCell(r[regionIdx]) : "",
+  }));
+
+  return { rows: parsed, warnings, detected: { headerRowIdx, nameIdx, urlIdx, catIdx, regionIdx, header } };
+}
+
+function ImportModal({ onClose, onConfirm, existingPages }) {
+  const [stage, setStage] = useState("pick"); // pick | preview | done
+  const [fileName, setFileName] = useState("");
+  const [parsedRows, setParsedRows] = useState([]);
+  const [warnings, setWarnings] = useState([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const existingNames = useMemo(() => new Set(existingPages.map((p) => p.name)), [existingPages]);
+
+  const handleFile = async (file) => {
+    setBusy(true);
+    setError("");
+    try {
+      const { rows, warnings } = await parseImportFile(file);
+      setFileName(file.name);
+      setParsedRows(rows);
+      setWarnings(warnings);
+      setStage("preview");
+    } catch (e) {
+      console.error(e);
+      setError("讀取檔案失敗，請確認是否為 .xlsx 或 .csv 格式");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const validRows = parsedRows.filter((r) => r.name);
+  const duplicateRows = validRows.filter((r) => existingNames.has(r.name));
+  const newRows = validRows.filter((r) => !existingNames.has(r.name));
+  const blankNameCount = parsedRows.length - validRows.length;
+
+  return (
+    <div style={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={styles.modalCard}>
+        <div style={styles.modalHeader}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <Icon name="download" size={17} />
+            <span style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 17 }}>匯入粉絲團清單</span>
+          </div>
+          <button style={styles.iconBtn} onClick={onClose}><Icon name="x" size={18} /></button>
+        </div>
+
+        <div style={styles.modalBody}>
+          {stage === "pick" && (
+            <>
+              <p style={{ fontSize: 13.5, color: "#7A7568", marginTop: 0, lineHeight: 1.7 }}>
+                上傳 Excel（.xlsx）或 CSV 檔案，第一行需是標題列（例如「名稱」「網址」「集團」），系統會自動辨識欄位對應。
+              </p>
+              <div
+                style={styles.dropZone}
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) handleFile(f);
+                }}
+              >
+                <Icon name="download" size={26} className="" />
+                <div style={{ marginTop: 10, fontSize: 13.5 }}>{busy ? "讀取中…" : "點擊選擇檔案，或拖曳檔案到這裡"}</div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  style={{ display: "none" }}
+                  onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
+              </div>
+              {error && <div style={styles.errorBox}>{error}</div>}
+            </>
+          )}
+
+          {stage === "preview" && (
+            <>
+              <div style={{ fontSize: 13, color: "#7A7568", marginBottom: 12 }}>
+                檔案「{fileName}」共讀到 <b>{parsedRows.length}</b> 筆資料。
+              </div>
+
+              {warnings.length > 0 && (
+                <div style={styles.warnBox}>
+                  {warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+                </div>
+              )}
+
+              <div style={styles.importStatRow}>
+                <div style={styles.importStat}><span style={{ color: "#7B8F77", fontWeight: 600 }}>{newRows.length}</span> 筆將新增</div>
+                <div style={styles.importStat}><span style={{ color: "#C08081", fontWeight: 600 }}>{duplicateRows.length}</span> 筆名稱重複（將跳過）</div>
+                {blankNameCount > 0 && (
+                  <div style={styles.importStat}><span style={{ color: "#A6A096", fontWeight: 600 }}>{blankNameCount}</span> 筆無名稱（將跳過）</div>
+                )}
+              </div>
+
+              <div style={styles.importPreviewTableWrap}>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>列</th>
+                      <th style={styles.th}>名稱</th>
+                      <th style={styles.th}>網址</th>
+                      <th style={styles.th}>法人/集團</th>
+                      <th style={styles.th}>地區</th>
+                      <th style={styles.th}>狀態</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsedRows.map((r, i) => {
+                      const isDup = r.name && existingNames.has(r.name);
+                      const isBlank = !r.name;
+                      return (
+                        <tr key={i} style={styles.tr}>
+                          <td style={{ ...styles.td, color: "#A6A096" }}>{r.rowNum}</td>
+                          <td style={styles.td}>{r.name || <span style={{ color: "#C08081" }}>（空白）</span>}</td>
+                          <td style={{ ...styles.td, fontSize: 12.5, color: "#7A7568" }}>{r.url || "—"}</td>
+                          <td style={styles.td}>{r.category || "—"}</td>
+                          <td style={styles.td}>{r.region || "—"}</td>
+                          <td style={styles.td}>
+                            {isBlank ? <span style={styles.tagBad}>無名稱</span> : isDup ? <span style={styles.tagWarn}>重複</span> : <span style={styles.tagGood}>新增</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {stage === "done" && (
+            <div style={{ textAlign: "center", padding: "30px 0" }}>
+              <Icon name="spark" size={28} className="" />
+              <div style={{ marginTop: 10, fontSize: 14.5 }}>已成功匯入 {newRows.length} 家粉絲團</div>
+            </div>
+          )}
+        </div>
+
+        <div style={styles.modalFooter}>
+          {stage === "preview" && (
+            <>
+              <button style={styles.secondaryBtn} onClick={() => setStage("pick")}>重新選擇檔案</button>
+              <button
+                style={styles.primaryBtn}
+                disabled={newRows.length === 0}
+                onClick={() => {
+                  onConfirm(newRows);
+                  setStage("done");
+                }}
+              >
+                <Icon name="plus" size={16} />
+                確認匯入 {newRows.length} 家
+              </button>
+            </>
+          )}
+          {stage === "done" && (
+            <button style={styles.primaryBtn} onClick={onClose}>完成</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, posts, savePosts }) {
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [region, setRegion] = useState("");
+  const [url, setUrl] = useState("");
+  const [query, setQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterRegion, setFilterRegion] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editUrl, setEditUrl] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editRegion, setEditRegion] = useState("");
+  const [showImport, setShowImport] = useState(false);
+  const [pendingRestore, setPendingRestore] = useState(null); // parsed backup object awaiting confirmation
+  const [restoreError, setRestoreError] = useState("");
+  const [pendingDeleteId, setPendingDeleteId] = useState(null); // page id awaiting delete confirmation
+  const restoreInputRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const addPage = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    if (pages.some((p) => p.name === trimmed)) {
+      showToast("已有同名粉絲團");
+      return;
+    }
+    const next = [...pages, { id: uid(), name: trimmed, category: category.trim(), region: region.trim(), url: url.trim() }];
+    savePages(next);
+    setName("");
+    setCategory("");
+    setRegion("");
+    setUrl("");
+    showToast(`已新增「${trimmed}」`);
+    inputRef.current?.focus();
+  };
+
+  const requestDeletePage = (id) => setPendingDeleteId(id);
+
+  const confirmDeletePage = () => {
+    const p = pages.find((x) => x.id === pendingDeleteId);
+    savePages(pages.filter((x) => x.id !== pendingDeleteId));
+    showToast(`已移除「${p?.name}」（歷史貼文與粉絲數紀錄仍會保留）`);
+    setPendingDeleteId(null);
+  };
+
+  const startEdit = (p) => {
+    setEditingId(p.id);
+    setEditName(p.name);
+    setEditUrl(p.url || "");
+    setEditCategory(p.category || "");
+    setEditRegion(p.region || "");
+  };
+
+  const commitEdit = () => {
+    const trimmed = editName.trim();
+    if (!trimmed) return;
+    savePages(pages.map((p) => (p.id === editingId ? { ...p, name: trimmed, url: editUrl.trim(), category: editCategory.trim(), region: editRegion.trim() } : p)));
+    setEditingId(null);
+  };
+
+  const handleImportConfirm = (newRows) => {
+    const additions = newRows.map((r) => ({ id: uid(), name: r.name, url: r.url, category: r.category, region: r.region }));
+    savePages([...pages, ...additions]);
+    showToast(`已匯入 ${additions.length} 家粉絲團`);
+  };
+
+  const categories = useMemo(() => [...new Set(pages.map((p) => p.category).filter(Boolean))].sort(), [pages]);
+  const regions = useMemo(() => [...new Set(pages.map((p) => p.region).filter(Boolean))].sort(), [pages]);
+
+  const filtered = pages.filter((p) => {
+    const matchesQuery = p.name.includes(query) || (p.category || "").includes(query) || (p.region || "").includes(query);
+    const matchesCategory = !filterCategory || p.category === filterCategory;
+    const matchesRegion = !filterRegion || p.region === filterRegion;
+    return matchesQuery && matchesCategory && matchesRegion;
+  });
+  const currentMonth = nowMonth();
+
+  /* ---------------- Full data backup (export / restore) ---------------- */
+  const exportBackup = () => {
+    const backup = {
+      app: "fbmonitor",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      pages,
+      fanRecords,
+      posts,
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `粉絲團監測站_完整備份_${nowMonth()}_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("已匯出完整備份");
+  };
+
+  const handleRestoreFile = async (file) => {
+    setRestoreError("");
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data || typeof data !== "object" || !Array.isArray(data.pages) || typeof data.fanRecords !== "object" || !Array.isArray(data.posts)) {
+        setRestoreError("這個檔案的格式不像是本系統的備份檔，請確認檔案是否正確。");
+        return;
+      }
+      setPendingRestore(data);
+    } catch (e) {
+      setRestoreError("讀取失敗，請確認檔案是有效的 JSON 備份檔。");
+    }
+  };
+
+  const confirmRestore = () => {
+    if (!pendingRestore) return;
+    savePages(pendingRestore.pages || []);
+    saveFanRecords(pendingRestore.fanRecords || {});
+    savePosts(pendingRestore.posts || []);
+    showToast("已從備份還原所有資料");
+    setPendingRestore(null);
+  };
+
+  return (
+    <div style={styles.viewWrap}>
+      <Header
+        title="粉絲團清單"
+        subtitle={`目前追蹤 ${pages.length} 家粉絲團，可隨時新增或移除`}
+      >
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button style={styles.secondaryBtn} onClick={() => setShowImport(true)}>
+            <Icon name="download" size={16} />
+            匯入 Excel
+          </button>
+          <button style={styles.secondaryBtn} onClick={exportBackup}>
+            <Icon name="save" size={16} />
+            匯出完整備份
+          </button>
+          <button style={styles.secondaryBtn} onClick={() => restoreInputRef.current?.click()}>
+            <Icon name="trend" size={16} />
+            從備份還原
+          </button>
+          <input
+            ref={restoreInputRef}
+            type="file"
+            accept=".json"
+            style={{ display: "none" }}
+            onChange={(e) => e.target.files?.[0] && handleRestoreFile(e.target.files[0])}
+          />
+        </div>
+      </Header>
+
+      {restoreError && <div style={styles.errorBox}>{restoreError}</div>}
+
+      {pendingDeleteId && (
+        <ConfirmDialog
+          title="確認移除粉絲團"
+          message={`確定要移除「${pages.find((p) => p.id === pendingDeleteId)?.name || ""}」嗎？這個粉絲團的歷史貼文與粉絲數紀錄會保留，但會從清單中消失，且這個動作無法復原。`}
+          onConfirm={confirmDeletePage}
+          onCancel={() => setPendingDeleteId(null)}
+        />
+      )}
+
+      {pendingRestore && (
+        <div style={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && setPendingRestore(null)}>
+          <div style={{ ...styles.modalCard, maxWidth: 520 }}>
+            <div style={styles.modalHeader}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <Icon name="trend" size={17} />
+                <span style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 17 }}>確認還原備份</span>
+              </div>
+              <button style={styles.iconBtn} onClick={() => setPendingRestore(null)}><Icon name="x" size={18} /></button>
+            </div>
+            <div style={styles.modalBody}>
+              <p style={{ fontSize: 13.5, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
+                這份備份包含 <b>{(pendingRestore.pages || []).length}</b> 家粉絲團、
+                <b>{(pendingRestore.posts || []).length}</b> 筆貼文紀錄。
+              </p>
+              <div style={styles.warnBox}>
+                ⚠ 還原會「整批覆蓋」目前畫面上的所有資料（粉絲團清單、粉絲數紀錄、貼文紀錄），現有資料將會被取代，無法復原。請確認這是你要的備份檔案。
+              </div>
+            </div>
+            <div style={styles.modalFooter}>
+              <button style={styles.secondaryBtn} onClick={() => setPendingRestore(null)}>取消</button>
+              <button style={{ ...styles.primaryBtn, background: "#C08081" }} onClick={confirmRestore}>
+                確認覆蓋並還原
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showImport && (
+        <ImportModal
+          existingPages={pages}
+          onClose={() => setShowImport(false)}
+          onConfirm={handleImportConfirm}
+        />
+      )}
+
+      <div style={styles.card}>
+        <div className="fbm-form-grid" style={styles.formGrid}>
+          <Field label="粉絲團名稱" style={{ gridColumn: "span 2" }}>
+            <input
+              ref={inputRef}
+              style={styles.input}
+              value={name}
+              placeholder="例如：某某品牌官方粉絲團"
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addPage()}
+            />
+          </Field>
+          <Field label="粉絲團網址" style={{ gridColumn: "span 2" }}>
+            <input
+              style={styles.input}
+              value={url}
+              placeholder="https://www.facebook.com/..."
+              onChange={(e) => setUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addPage()}
+            />
+          </Field>
+          <Field label="法人/集團（選填）">
+            <input
+              style={styles.input}
+              value={category}
+              placeholder="例如：A"
+              onChange={(e) => setCategory(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addPage()}
+            />
+          </Field>
+          <Field label="地區（選填）">
+            <input
+              style={styles.input}
+              value={region}
+              placeholder="例如：新北"
+              onChange={(e) => setRegion(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addPage()}
+            />
+          </Field>
+          <div style={{ display: "flex", alignItems: "flex-end" }}>
+            <button style={{ ...styles.primaryBtn, width: "100%" }} onClick={addPage}>
+              <Icon name="plus" size={16} />
+              新增
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {(categories.length > 0 || regions.length > 0) && (
+        <div style={styles.card}>
+          {categories.length > 0 && (
+            <div style={{ marginBottom: regions.length > 0 ? 14 : 0 }}>
+              <div style={styles.filterLabel}>依法人/集團篩選</div>
+              <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                <button
+                  style={{ ...styles.chipBtn, ...(filterCategory === "" ? styles.chipBtnActive : {}) }}
+                  onClick={() => setFilterCategory("")}
+                >
+                  全部
+                </button>
+                {categories.map((c) => (
+                  <button
+                    key={c}
+                    style={{ ...styles.chipBtn, ...(filterCategory === c ? styles.chipBtnActive : {}) }}
+                    onClick={() => setFilterCategory(filterCategory === c ? "" : c)}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {regions.length > 0 && (
+            <div>
+              <div style={styles.filterLabel}>依地區篩選</div>
+              <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                <button
+                  style={{ ...styles.chipBtn, ...(filterRegion === "" ? styles.chipBtnActive : {}) }}
+                  onClick={() => setFilterRegion("")}
+                >
+                  全部
+                </button>
+                {regions.map((r) => (
+                  <button
+                    key={r}
+                    style={{ ...styles.chipBtn, ...(filterRegion === r ? styles.chipBtnActive : {}) }}
+                    onClick={() => setFilterRegion(filterRegion === r ? "" : r)}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "14px 18px", borderBottom: "1px solid #E6E1D6", display: "flex", alignItems: "center", gap: 8 }}>
+          <Icon name="search" size={15} className="" />
+          <input
+            style={{ ...styles.input, border: "none", padding: "4px 0", flex: 1 }}
+            placeholder="搜尋粉絲團、法人或地區…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        {filtered.length === 0 ? (
+          <EmptyState text={pages.length === 0 ? "還沒有任何粉絲團，先在上方新增第一家，或用右上角「匯入 Excel」一次匯入。" : "找不到符合的粉絲團。"} />
+        ) : (
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>粉絲團</th>
+                <th style={{ ...styles.th, width: 90 }}>法人</th>
+                <th style={{ ...styles.th, width: 90 }}>地區</th>
+                <th style={{ ...styles.th, textAlign: "right", width: 130, whiteSpace: "nowrap" }}>最新粉絲數</th>
+                <th style={{ ...styles.th, width: 90 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => {
+                const latest = latestInMonth(fanRecords, p.id, currentMonth);
+                return (
+                  <tr key={p.id} style={styles.tr}>
+                    <td style={styles.td}>
+                      {editingId === p.id ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
+                          <input
+                            autoFocus
+                            style={styles.input}
+                            value={editName}
+                            placeholder="粉絲團名稱"
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && commitEdit()}
+                          />
+                          <input
+                            style={{ ...styles.input, fontSize: 12.5 }}
+                            value={editUrl}
+                            placeholder="粉絲團網址"
+                            onChange={(e) => setEditUrl(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && commitEdit()}
+                          />
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <input
+                              style={{ ...styles.input, fontSize: 12.5 }}
+                              value={editCategory}
+                              placeholder="法人/集團"
+                              onChange={(e) => setEditCategory(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && commitEdit()}
+                            />
+                            <input
+                              style={{ ...styles.input, fontSize: 12.5 }}
+                              value={editRegion}
+                              placeholder="地區"
+                              onChange={(e) => setEditRegion(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && commitEdit()}
+                              onBlur={commitEdit}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div style={{ fontWeight: 500 }}>{p.name}</div>
+                          {p.url && (
+                            <a href={p.url} target="_blank" rel="noreferrer" style={{ ...styles.link, marginTop: 2 }}>
+                              <Icon name="link" size={12} /> {p.url.replace(/^https?:\/\//, "").slice(0, 36)}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td style={styles.td}>
+                      {editingId !== p.id && <span style={styles.tag}>{p.category || "—"}</span>}
+                    </td>
+                    <td style={styles.td}>
+                      {editingId !== p.id && <span style={styles.tag}>{p.region || "—"}</span>}
+                    </td>
+                    <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>
+                      {latest ? latest.count.toLocaleString() : "—"}
+                    </td>
+                    <td style={{ ...styles.td, textAlign: "right" }}>
+                      {editingId === p.id ? (
+                        <button style={{ ...styles.iconBtn, color: "#7B8F77" }} onClick={commitEdit} title="儲存">
+                          <Icon name="save" size={15} />
+                        </button>
+                      ) : (
+                        <button style={styles.iconBtn} onClick={() => startEdit(p)} title="編輯">
+                          <Icon name="edit" size={15} />
+                        </button>
+                      )}
+                      <button style={{ ...styles.iconBtn, color: "#C08081" }} onClick={() => requestDeletePage(p.id)} title="移除">
+                        <Icon name="trash" size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ Input view ============================================================ */
+function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month, setMonth, showToast }) {
+  const [tab, setTab] = useState("posts"); // posts | fans
+  const [selectedPageId, setSelectedPageId] = useState(pages[0]?.id || "");
+  const [draft, setDraft] = useState({ url: "", views: "", likes: "", comments: "", shares: "", type: "static", date: "" });
+  const urlRef = useRef(null);
+
+  // editing an existing post
+  const [editingPostId, setEditingPostId] = useState(null);
+  const [editDraft, setEditDraft] = useState(null);
+
+  // fan-count tab draft
+  const [fanPageId, setFanPageId] = useState(pages[0]?.id || "");
+  const [fanDate, setFanDate] = useState(todayStr());
+  const [fanCount, setFanCount] = useState("");
+  const fanInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!selectedPageId && pages.length) setSelectedPageId(pages[0].id);
+    if (!fanPageId && pages.length) setFanPageId(pages[0].id);
+  }, [pages, selectedPageId, fanPageId]);
+
+  useEffect(() => {
+    if (!draft.date) setDraft((d) => ({ ...d, date: `${month}-01` }));
+  }, [month]);
+
+  const monthPosts = useMemo(
+    () => posts.filter((p) => p.month === month && p.pageId === selectedPageId).sort((a, b) => (b.date || "").localeCompare(a.date || "")),
+    [posts, month, selectedPageId]
+  );
+
+  const resetDraft = () => setDraft({ url: "", views: "", likes: "", comments: "", shares: "", type: draft.type, date: draft.date });
+
+  const addPost = () => {
+    if (!selectedPageId) {
+      showToast("請先選擇粉絲團");
+      return;
+    }
+    const views = Number(draft.views) || 0;
+    const likes = Number(draft.likes) || 0;
+    const comments = Number(draft.comments) || 0;
+    const shares = Number(draft.shares) || 0;
+    if (!draft.url.trim() && views === 0 && likes === 0 && comments === 0 && shares === 0) {
+      showToast("請至少輸入貼文連結或互動數字");
+      return;
+    }
+    const entry = {
+      id: uid(),
+      pageId: selectedPageId,
+      url: draft.url.trim(),
+      views,
+      likes,
+      comments,
+      shares,
+      type: draft.type,
+      date: draft.date || `${month}-01`,
+      month,
+    };
+    savePosts([...posts, entry]);
+    resetDraft();
+    urlRef.current?.focus();
+  };
+
+  const removePost = (id) => savePosts(posts.filter((p) => p.id !== id));
+
+  const [pendingDeletePostId, setPendingDeletePostId] = useState(null);
+  const requestDeletePost = (id) => setPendingDeletePostId(id);
+  const confirmDeletePost = () => {
+    removePost(pendingDeletePostId);
+    setPendingDeletePostId(null);
+  };
+
+  const startEditPost = (p) => {
+    setEditingPostId(p.id);
+    setEditDraft({
+      url: p.url || "",
+      views: p.views || "",
+      likes: p.likes || "",
+      comments: p.comments || "",
+      shares: p.shares || "",
+      type: p.type,
+      date: p.date,
+    });
+  };
+
+  const cancelEditPost = () => {
+    setEditingPostId(null);
+    setEditDraft(null);
+  };
+
+  const commitEditPost = () => {
+    if (!editingPostId || !editDraft) return;
+    const updated = {
+      url: editDraft.url.trim(),
+      views: Number(editDraft.views) || 0,
+      likes: Number(editDraft.likes) || 0,
+      comments: Number(editDraft.comments) || 0,
+      shares: Number(editDraft.shares) || 0,
+      type: editDraft.type,
+      date: editDraft.date,
+    };
+    savePosts(posts.map((p) => (p.id === editingPostId ? { ...p, ...updated, month: updated.date.slice(0, 7) } : p)));
+    showToast("已更新貼文數據");
+    setEditingPostId(null);
+    setEditDraft(null);
+  };
+
+  const fanEntriesThisMonth = useMemo(
+    () => entriesInMonth(fanRecords, fanPageId, month),
+    [fanRecords, fanPageId, month]
+  );
+
+  const addFanEntry = () => {
+    if (!fanPageId) {
+      showToast("請先選擇粉絲團");
+      return;
+    }
+    if (fanCount === "" || isNaN(Number(fanCount))) {
+      showToast("請輸入粉絲人數");
+      return;
+    }
+    const entry = { id: uid(), date: fanDate || todayStr(), count: Number(fanCount) };
+    const existing = fanRecords[fanPageId] || [];
+    const next = { ...fanRecords, [fanPageId]: [...existing, entry] };
+    saveFanRecords(next);
+    setFanCount("");
+    fanInputRef.current?.focus();
+  };
+
+  const removeFanEntry = (pageId, entryId) => {
+    const next = { ...fanRecords, [pageId]: (fanRecords[pageId] || []).filter((e) => e.id !== entryId) };
+    saveFanRecords(next);
+  };
+
+  const selectedPage = pages.find((p) => p.id === selectedPageId);
+  const fanPage = pages.find((p) => p.id === fanPageId);
+
+  return (
+    <div style={styles.viewWrap}>
+      <Header title="本月輸入" subtitle="記錄各粉絲團的貼文互動數與粉絲人數">
+        <MonthSwitcher month={month} setMonth={setMonth} />
+      </Header>
+
+      {pendingDeletePostId && (
+        <ConfirmDialog
+          title="確認刪除貼文紀錄"
+          message="確定要刪除這筆貼文紀錄嗎？刪除後無法復原。"
+          onConfirm={confirmDeletePost}
+          onCancel={() => setPendingDeletePostId(null)}
+        />
+      )}
+
+      <div style={styles.tabRow}>
+        <button style={{ ...styles.tabBtn, ...(tab === "posts" ? styles.tabBtnActive : {}) }} onClick={() => setTab("posts")}>
+          貼文互動數
+        </button>
+        <button style={{ ...styles.tabBtn, ...(tab === "fans" ? styles.tabBtnActive : {}) }} onClick={() => setTab("fans")}>
+          粉絲人數
+        </button>
+      </div>
+
+      {pages.length === 0 ? (
+        <div style={styles.card}>
+          <EmptyState text="請先到「粉絲團清單」新增粉絲團，才能開始輸入資料。" />
+        </div>
+      ) : tab === "posts" ? (
+        <>
+          <div style={styles.card}>
+            <div className="fbm-form-grid" style={styles.formGrid}>
+              <Field label="粉絲團" style={{ gridColumn: "span 2" }}>
+                <select style={styles.input} value={selectedPageId} onChange={(e) => setSelectedPageId(e.target.value)}>
+                  {pages.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="日期">
+                <input type="date" style={styles.input} value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+              </Field>
+              <Field label="類型">
+                <select style={styles.input} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })}>
+                  {POST_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="貼文連結" style={{ gridColumn: "span 4" }}>
+                <input
+                  ref={urlRef}
+                  style={styles.input}
+                  placeholder="貼上貼文網址（選填）"
+                  value={draft.url}
+                  onChange={(e) => setDraft({ ...draft, url: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && addPost()}
+                />
+              </Field>
+              <Field label="讚數">
+                <input
+                  type="number"
+                  style={styles.input}
+                  value={draft.likes}
+                  onChange={(e) => setDraft({ ...draft, likes: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && addPost()}
+                />
+              </Field>
+              <Field label="留言數">
+                <input
+                  type="number"
+                  style={styles.input}
+                  value={draft.comments}
+                  onChange={(e) => setDraft({ ...draft, comments: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && addPost()}
+                />
+              </Field>
+              <Field label="分享數">
+                <input
+                  type="number"
+                  style={styles.input}
+                  value={draft.shares}
+                  onChange={(e) => setDraft({ ...draft, shares: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && addPost()}
+                />
+              </Field>
+              <Field label="觀看數（影片用）">
+                <input
+                  type="number"
+                  style={styles.input}
+                  value={draft.views}
+                  onChange={(e) => setDraft({ ...draft, views: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && addPost()}
+                />
+              </Field>
+              <div style={{ display: "flex", alignItems: "flex-end", gridColumn: "span 4" }}>
+                <button style={{ ...styles.primaryBtn, width: "100%" }} onClick={addPost}>
+                  <Icon name="plus" size={16} />
+                  新增並繼續
+                </button>
+              </div>
+            </div>
+            <div style={styles.hint}>按 Enter 可快速新增下一筆，粉絲團與類型設定會延續，方便連續輸入同一家的多篇貼文。觀看數只有影片/Reels類型才會有，靜態貼文可留空。</div>
+          </div>
+
+          <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+            <div style={styles.cardHeadRow}>
+              <span>{selectedPage?.name || "—"} · {monthLabel(month)} 已輸入 {monthPosts.length} 篇</span>
+            </div>
+            {monthPosts.length === 0 ? (
+              <EmptyState text="這個粉絲團本月還沒有輸入任何貼文。" />
+            ) : (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>日期</th>
+                    <th style={styles.th}>類型</th>
+                    <th style={styles.th}>連結</th>
+                    <th style={{ ...styles.th, textAlign: "right" }}>讚</th>
+                    <th style={{ ...styles.th, textAlign: "right" }}>留言</th>
+                    <th style={{ ...styles.th, textAlign: "right" }}>分享</th>
+                    <th style={{ ...styles.th, textAlign: "right" }}>觀看數<br /><span style={styles.thSubLabel}>僅供參考</span></th>
+                    <th style={{ ...styles.th, textAlign: "right" }}>互動總計<br /><span style={styles.thSubLabel}>讚+留言+分享</span></th>
+                    <th style={{ ...styles.th, width: 70 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthPosts.map((p) => {
+                    const isEditing = editingPostId === p.id;
+                    if (isEditing) {
+                      return (
+                        <tr key={p.id} style={{ ...styles.tr, background: "#F3F0EA" }}>
+                          <td style={styles.td}>
+                            <input type="date" style={{ ...styles.input, fontSize: 12.5 }} value={editDraft.date} onChange={(e) => setEditDraft({ ...editDraft, date: e.target.value })} />
+                          </td>
+                          <td style={styles.td}>
+                            <select style={{ ...styles.input, fontSize: 12.5 }} value={editDraft.type} onChange={(e) => setEditDraft({ ...editDraft, type: e.target.value })}>
+                              {POST_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            </select>
+                          </td>
+                          <td style={styles.td}>
+                            <input style={{ ...styles.input, fontSize: 12.5, minWidth: 140 }} value={editDraft.url} placeholder="貼文網址" onChange={(e) => setEditDraft({ ...editDraft, url: e.target.value })} />
+                          </td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>
+                            <input type="number" style={{ ...styles.input, fontSize: 12.5, textAlign: "right", maxWidth: 80 }} value={editDraft.likes} onChange={(e) => setEditDraft({ ...editDraft, likes: e.target.value })} />
+                          </td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>
+                            <input type="number" style={{ ...styles.input, fontSize: 12.5, textAlign: "right", maxWidth: 80 }} value={editDraft.comments} onChange={(e) => setEditDraft({ ...editDraft, comments: e.target.value })} />
+                          </td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>
+                            <input type="number" style={{ ...styles.input, fontSize: 12.5, textAlign: "right", maxWidth: 80 }} value={editDraft.shares} onChange={(e) => setEditDraft({ ...editDraft, shares: e.target.value })} />
+                          </td>
+                          <td style={{ ...styles.td, textAlign: "right" }}>
+                            <input type="number" style={{ ...styles.input, fontSize: 12.5, textAlign: "right", maxWidth: 90 }} value={editDraft.views} onChange={(e) => setEditDraft({ ...editDraft, views: e.target.value })} />
+                          </td>
+                          <td style={{ ...styles.td, textAlign: "right", color: "#A6A096", fontSize: 12.5 }}>—</td>
+                          <td style={{ ...styles.td, textAlign: "right", whiteSpace: "nowrap" }}>
+                            <button style={{ ...styles.iconBtn, color: "#7B8F77" }} onClick={commitEditPost} title="儲存">
+                              <Icon name="save" size={14} />
+                            </button>
+                            <button style={styles.iconBtn} onClick={cancelEditPost} title="取消">
+                              <Icon name="x" size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return (
+                      <tr key={p.id} style={styles.tr}>
+                        <td style={styles.td}>{p.date}</td>
+                        <td style={styles.td}><TypeTag type={p.type} /></td>
+                        <td style={styles.td}>
+                          {p.url ? (
+                            <a href={p.url} target="_blank" rel="noreferrer" style={styles.link}>
+                              <Icon name="link" size={13} /> 查看
+                            </a>
+                          ) : (
+                            <span style={{ color: "#A6A096" }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.likes}</td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.comments}</td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.shares}</td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.views ? "#A18A4C" : "#A6A096", fontWeight: p.views ? 600 : 400 }}>
+                          {p.views ? p.views.toLocaleString() : "—"}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500 }}>{engagement(p)}</td>
+                        <td style={{ ...styles.td, textAlign: "right", whiteSpace: "nowrap" }}>
+                          <button style={styles.iconBtn} onClick={() => startEditPost(p)} title="編輯">
+                            <Icon name="edit" size={14} />
+                          </button>
+                          <button style={{ ...styles.iconBtn, color: "#C08081" }} onClick={() => requestDeletePost(p.id)} title="刪除">
+                            <Icon name="trash" size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={styles.card}>
+            <div className="fbm-form-grid" style={styles.formGrid}>
+              <Field label="粉絲團" style={{ gridColumn: "span 2" }}>
+                <select style={styles.input} value={fanPageId} onChange={(e) => setFanPageId(e.target.value)}>
+                  {pages.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="量測日期">
+                <input type="date" style={styles.input} value={fanDate} onChange={(e) => setFanDate(e.target.value)} />
+              </Field>
+              <Field label="粉絲人數">
+                <input
+                  ref={fanInputRef}
+                  type="number"
+                  style={styles.input}
+                  value={fanCount}
+                  placeholder="輸入人數"
+                  onChange={(e) => setFanCount(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addFanEntry()}
+                />
+              </Field>
+              <div style={{ display: "flex", alignItems: "flex-end" }}>
+                <button style={{ ...styles.primaryBtn, width: "100%" }} onClick={addFanEntry}>
+                  <Icon name="plus" size={16} />
+                  新增紀錄
+                </button>
+              </div>
+            </div>
+            <div style={styles.hint}>同一個粉絲團、同一個月可以記錄多筆不同日期的快照，報表會以每月最新一筆計算月增長。</div>
+          </div>
+
+          <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+            <div style={styles.cardHeadRow}>{fanPage?.name || "—"} · {monthLabel(month)} 粉絲數紀錄</div>
+            {fanEntriesThisMonth.length === 0 ? (
+              <EmptyState text="這個粉絲團本月還沒有粉絲人數紀錄。" />
+            ) : (
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>日期</th>
+                    <th style={{ ...styles.th, textAlign: "right" }}>粉絲人數</th>
+                    <th style={{ ...styles.th, width: 40 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fanEntriesThisMonth.map((e) => (
+                    <tr key={e.id} style={styles.tr}>
+                      <td style={styles.td}>{e.date}</td>
+                      <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{e.count.toLocaleString()}</td>
+                      <td style={{ ...styles.td, textAlign: "right" }}>
+                        <button style={{ ...styles.iconBtn, color: "#C08081" }} onClick={() => removeFanEntry(fanPageId, e.id)}>
+                          <Icon name="trash" size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+            <div style={styles.cardHeadRow}>所有粉絲團 · {monthLabel(month)} 最新一筆快照</div>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>粉絲團</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>最新人數</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>量測日期</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>本月筆數</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pages.map((p) => {
+                  const all = entriesInMonth(fanRecords, p.id, month);
+                  const latest = all.length ? all[all.length - 1] : null;
+                  return (
+                    <tr key={p.id} style={styles.tr}>
+                      <td style={styles.td}>{p.name}</td>
+                      <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>
+                        {latest ? latest.count.toLocaleString() : "—"}
+                      </td>
+                      <td style={{ ...styles.td, textAlign: "right", color: "#A6A096" }}>{latest ? latest.date : "—"}</td>
+                      <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: "#A6A096" }}>{all.length}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TypeTag({ type }) {
+  const t = POST_TYPES.find((x) => x.value === type) || POST_TYPES[3];
+  return (
+    <span style={styles.typeTag}>
+      <Icon name={t.icon} size={13} />
+      {t.label}
+    </span>
+  );
+}
+
+/* ============================================================ Report view ============================================================ */
+function ReportView({ pages, posts, fanRecords, month, setMonth, showToast }) {
+  const monthPosts = useMemo(() => posts.filter((p) => p.month === month), [posts, month]);
+  const pageMap = useMemo(() => {
+    const m = {};
+    pages.forEach((p) => (m[p.id] = p));
+    return m;
+  }, [pages]);
+
+  const topLiked = useMemo(
+    () => [...monthPosts].sort((a, b) => b.likes - a.likes).slice(0, 10),
+    [monthPosts]
+  );
+  const topEngaged = useMemo(
+    () => [...monthPosts].sort((a, b) => engagement(b) - engagement(a)).slice(0, 10),
+    [monthPosts]
+  );
+
+  const fanGrowth = useMemo(() => {
+    const prevMonth = shiftMonth(month, -1);
+    return pages
+      .map((p) => {
+        const curEntry = latestInMonth(fanRecords, p.id, month);
+        const prevEntry = latestInMonth(fanRecords, p.id, prevMonth);
+        const cur = curEntry?.count;
+        const prev = prevEntry?.count;
+        const diff = typeof cur === "number" && typeof prev === "number" ? cur - prev : null;
+        const pct = diff != null && prev > 0 ? (diff / prev) * 100 : null;
+        return { page: p, cur, curDate: curEntry?.date, prev, diff, pct };
+      })
+      .filter((r) => r.cur != null)
+      .sort((a, b) => (b.diff ?? -Infinity) - (a.diff ?? -Infinity));
+  }, [pages, fanRecords, month]);
+
+  const totals = useMemo(() => {
+    const totalFans = fanGrowth.reduce((s, r) => s + (r.cur || 0), 0);
+    const totalGrowth = fanGrowth.reduce((s, r) => s + (r.diff || 0), 0);
+    return { totalFans, totalGrowth, postCount: monthPosts.length };
+  }, [fanGrowth, monthPosts]);
+
+  /* ---------------- AI analysis prompt generator ---------------- */
+  const [promptPageIds, setPromptPageIds] = useState([]);
+  const [promptQuery, setPromptQuery] = useState("");
+  const [generatedPrompt, setGeneratedPrompt] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const promptFilteredPages = useMemo(() => {
+    const q = promptQuery.trim();
+    if (!q) return pages;
+    return pages.filter((p) => p.name.includes(q) || (p.category || "").includes(q) || (p.region || "").includes(q));
+  }, [pages, promptQuery]);
+
+  const togglePromptPage = (id) => {
+    setPromptPageIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  };
+
+  const buildPrompt = () => {
+    const targetPages = promptPageIds.length > 0 ? pages.filter((p) => promptPageIds.includes(p.id)) : pages;
+    const targetIds = new Set(targetPages.map((p) => p.id));
+    const relevantPosts = monthPosts.filter((p) => targetIds.has(p.pageId));
+
+    if (relevantPosts.length === 0) {
+      showToast("所選範圍內這個月沒有貼文資料，無法產生分析提示詞");
+      return;
+    }
+
+    const lines = [];
+    lines.push(`你是一位社群媒體經營顧問，請根據以下 ${monthLabel(month)} 的 Facebook 粉絲團貼文數據，分析這個月的貼文表現。`);
+    lines.push("");
+    lines.push(`分析對象：${targetPages.map((p) => p.name).join("、")}`);
+    lines.push(`資料範圍：${monthLabel(month)}，共 ${relevantPosts.length} 篇貼文`);
+    lines.push("");
+    lines.push("請特別分析：");
+    lines.push("1. 哪一種貼文類型（靜態貼文／影片／Reels／其他）整體互動率（讚+留言+分享）或觀看數表現最好？");
+    lines.push("2. 表現最好的前幾篇貼文有什麼共同特徵（例如內容主題、發文時間、貼文類型）？推測可能的原因。");
+    lines.push("3. 如果同時有觀看數與互動數資料，請比較「高觀看但低互動」與「高互動」的貼文差異，並說明可能原因。");
+    lines.push("4. 若我有提供貼文連結，請你假設能讀取該連結的網友留言內容，分析留言的情緒傾向（正面/負面/中性）與常見討論主題，並說明這些留言對品牌經營的意義；若無法直接讀取網址內容，請提醒我這點限制。");
+    lines.push("5. 給予下個月內容企劃的具體建議（例如該增加哪種類型的貼文、發文時間或主題方向）。");
+    lines.push("");
+    lines.push("=== 原始貼文資料 ===");
+    lines.push("（互動總計 = 讚+留言+分享；觀看數僅影片/Reels類型才有，且未計入互動總計，僅供參考）");
+    lines.push("");
+
+    targetPages.forEach((page) => {
+      const pagePosts = relevantPosts.filter((p) => p.pageId === page.id).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+      if (pagePosts.length === 0) return;
+      lines.push(`【${page.name}】（共 ${pagePosts.length} 篇）`);
+      pagePosts.forEach((p, i) => {
+        const typeLabel = POST_TYPES.find((t) => t.value === p.type)?.label || p.type;
+        const parts = [
+          `${i + 1}. 日期:${p.date}`,
+          `類型:${typeLabel}`,
+          `讚:${p.likes}`,
+          `留言:${p.comments}`,
+          `分享:${p.shares}`,
+          `互動總計:${engagement(p)}`,
+        ];
+        if (p.views) parts.push(`觀看數:${p.views}（僅供參考）`);
+        if (p.url) parts.push(`連結:${p.url}`);
+        lines.push("   " + parts.join("，"));
+      });
+      lines.push("");
+    });
+
+    setGeneratedPrompt(lines.join("\n"));
+    setCopied(false);
+  };
+
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedPrompt);
+      setCopied(true);
+      showToast("已複製到剪貼簿");
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      showToast("複製失敗，請手動選取文字複製");
+    }
+  };
+
+  const exportExcel = useCallback(async () => {
+    showToast("匯出中…");
+    try {
+      const wb = XLSX.utils.book_new();
+
+      const growthSheet = fanGrowth.map((r) => ({
+        粉絲團: r.page.name,
+        粉絲團網址: r.page.url || "",
+        法人集團: r.page.category || "",
+        地區: r.page.region || "",
+        本月粉絲數: r.cur ?? "",
+        量測日期: r.curDate ?? "",
+        上月粉絲數: r.prev ?? "",
+        增減人數: r.diff ?? "",
+        增減百分比: r.pct != null ? `${r.pct.toFixed(2)}%` : "",
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(growthSheet), "粉絲成長排名");
+
+      const toRow = (p, i) => ({
+        排名: i + 1,
+        粉絲團: pageMap[p.pageId]?.name || "",
+        粉絲團網址: pageMap[p.pageId]?.url || "",
+        法人集團: pageMap[p.pageId]?.category || "",
+        地區: pageMap[p.pageId]?.region || "",
+        日期: p.date,
+        類型: POST_TYPES.find((t) => t.value === p.type)?.label || p.type,
+        讚數: p.likes,
+        留言數: p.comments,
+        分享數: p.shares,
+        互動總計: engagement(p),
+        觀看數僅供參考: p.views || "",
+        貼文連結: p.url,
+      });
+
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topLiked.map(toRow)), "最高讚貼文");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topEngaged.map(toRow)), "最高互動貼文");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthPosts.map((p, i) => toRow(p, i))), "全部貼文紀錄");
+
+      XLSX.writeFile(wb, `粉絲團月報表_${month}.xlsx`);
+      showToast("已匯出 Excel");
+    } catch (e) {
+      console.error(e);
+      showToast("匯出失敗，請稍後再試");
+    }
+  }, [fanGrowth, topLiked, topEngaged, monthPosts, pageMap, month, showToast]);
+
+  return (
+    <div style={styles.viewWrap}>
+      <Header title="月報表" subtitle="當月各項監測指標總覽">
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <MonthSwitcher month={month} setMonth={setMonth} />
+          <button style={styles.primaryBtn} onClick={exportExcel}>
+            <Icon name="download" size={16} />
+            匯出 Excel
+          </button>
+        </div>
+      </Header>
+
+      <div style={styles.statRow}>
+        <StatCard icon="users" label="追蹤總粉絲數" value={totals.totalFans.toLocaleString()} />
+        <StatCard
+          icon="trend"
+          label="本月總增長"
+          value={(totals.totalGrowth >= 0 ? "+" : "") + totals.totalGrowth.toLocaleString()}
+          tone={totals.totalGrowth >= 0 ? "good" : "bad"}
+        />
+        <StatCard icon="spark" label="本月貼文紀錄數" value={totals.postCount.toLocaleString()} />
+      </div>
+
+      <SectionTitle icon="users" title="粉絲人數成長排名" />
+      <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+        {fanGrowth.length === 0 ? (
+          <EmptyState text="本月還沒有粉絲人數紀錄，請到「本月輸入」填入。" />
+        ) : (
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>排名</th>
+                <th style={styles.th}>粉絲團</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>本月人數</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>量測日期</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>增減</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>增減率</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fanGrowth.map((r, i) => (
+                <tr key={r.page.id} style={styles.tr}>
+                  <td style={styles.td}>{i === 0 ? <Icon name="crown" size={15} className="" /> : i + 1}</td>
+                  <td style={styles.td}>
+                    <PageNameCell page={r.page} />
+                  </td>
+                  <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{r.cur?.toLocaleString()}</td>
+                  <td style={{ ...styles.td, textAlign: "right", color: "#A6A096", fontSize: 12.5 }}>{r.curDate}</td>
+                  <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.diff == null ? "#A6A096" : r.diff >= 0 ? "#7B8F77" : "#C08081" }}>
+                    {r.diff == null ? "—" : (r.diff >= 0 ? "+" : "") + r.diff.toLocaleString()}
+                  </td>
+                  <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.pct == null ? "#A6A096" : r.pct >= 0 ? "#7B8F77" : "#C08081" }}>
+                    {r.pct == null ? "—" : `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <SectionTitle icon="heart" title="本月最高讚貼文 TOP 10" />
+      <PostRankTable posts={topLiked} pageMap={pageMap} metric="likes" metricLabel="讚數" />
+
+      <SectionTitle icon="spark" title="本月最高互動貼文 TOP 10" />
+      <PostRankTable posts={topEngaged} pageMap={pageMap} metric={engagement} metricLabel="互動總計" />
+
+      <SectionTitle icon="edit" title="AI 貼文表現分析提示詞" />
+      <div style={styles.card}>
+        <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
+          選擇要分析的經銷商（不選則代表全部），點「產生提示詞」後會整理成一段文字，複製貼到 Claude 或其他 AI 工具即可取得分析。這個應用程式本身不會自動產生分析結果，需要你手動貼到 AI 工具中。
+        </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+          <div style={{ fontSize: 12.5, color: "#9C9684" }}>
+            已選 {promptPageIds.length} / {pages.length} 家（不選＝全部）
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={styles.secondaryBtn} onClick={() => setPromptPageIds(promptFilteredPages.map((p) => p.id))}>全選</button>
+            <button style={styles.secondaryBtn} onClick={() => setPromptPageIds([])}>全取消</button>
+          </div>
+        </div>
+        <input
+          style={{ ...styles.input, marginBottom: 10 }}
+          placeholder="搜尋粉絲團名稱、法人或地區，篩選下方清單…"
+          value={promptQuery}
+          onChange={(e) => setPromptQuery(e.target.value)}
+        />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxHeight: 180, overflowY: "auto", marginBottom: 16 }}>
+          {promptFilteredPages.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: "#A6A096" }}>沒有符合搜尋條件的粉絲團</div>
+          ) : (
+            promptFilteredPages.map((p) => {
+              const active = promptPageIds.includes(p.id);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => togglePromptPage(p.id)}
+                  style={{ ...styles.chipBtn, ...(active ? styles.chipBtnActive : {}) }}
+                >
+                  {p.name}
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <button style={styles.primaryBtn} onClick={buildPrompt}>
+          <Icon name="spark" size={16} />
+          產生提示詞
+        </button>
+
+        {generatedPrompt && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 12.5, color: "#9C9684" }}>已產生，可直接複製貼到 AI 工具</div>
+              <button style={styles.secondaryBtn} onClick={copyPrompt}>
+                <Icon name={copied ? "save" : "link"} size={15} />
+                {copied ? "已複製" : "複製全部"}
+              </button>
+            </div>
+            <textarea
+              readOnly
+              value={generatedPrompt}
+              style={styles.promptTextarea}
+              onClick={(e) => e.target.select()}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PageNameCell({ page }) {
+  if (!page) return <span>（已移除）</span>;
+  if (!page.url) return <span style={{ fontWeight: 500 }}>{page.name}</span>;
+  return (
+    <a href={page.url} target="_blank" rel="noreferrer" style={{ ...styles.link, color: "#3A3A38", fontWeight: 500, textDecoration: "none" }}>
+      {page.name}
+      <Icon name="link" size={12} className="" />
+    </a>
+  );
+}
+
+function PostRankTable({ posts, pageMap, metric, metricLabel }) {
+  if (posts.length === 0) {
+    return (
+      <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+        <EmptyState text="本月還沒有貼文紀錄。" />
+      </div>
+    );
+  }
+  return (
+    <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+      <table style={styles.table}>
+        <thead>
+          <tr>
+            <th style={styles.th}>排名</th>
+            <th style={styles.th}>粉絲團</th>
+            <th style={styles.th}>日期</th>
+            <th style={styles.th}>類型</th>
+            <th style={styles.th}>連結</th>
+            <th style={{ ...styles.th, textAlign: "right" }}>讚</th>
+            <th style={{ ...styles.th, textAlign: "right" }}>留言</th>
+            <th style={{ ...styles.th, textAlign: "right" }}>分享</th>
+            <th style={{ ...styles.th, textAlign: "right" }}>觀看數<br /><span style={styles.thSubLabel}>僅供參考</span></th>
+            <th style={{ ...styles.th, textAlign: "right" }}>{metricLabel}<br /><span style={styles.thSubLabel}>讚+留言+分享</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {posts.map((p, i) => (
+            <tr key={p.id} style={styles.tr}>
+              <td style={styles.td}>{i === 0 ? <Icon name="crown" size={15} /> : i + 1}</td>
+              <td style={styles.td}>
+                <PageNameCell page={pageMap[p.pageId]} />
+              </td>
+              <td style={styles.td}>{p.date}</td>
+              <td style={styles.td}><TypeTag type={p.type} /></td>
+              <td style={styles.td}>
+                {p.url ? (
+                  <a href={p.url} target="_blank" rel="noreferrer" style={styles.link}>
+                    <Icon name="link" size={13} /> 查看
+                  </a>
+                ) : (
+                  <span style={{ color: "#A6A096" }}>—</span>
+                )}
+              </td>
+              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.likes}</td>
+              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.comments}</td>
+              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.shares}</td>
+              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.views ? "#A18A4C" : "#A6A096", fontWeight: p.views ? 600 : 400 }}>
+                {p.views ? p.views.toLocaleString() : "—"}
+              </td>
+              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>
+                {typeof metric === "function" ? metric(p) : p[metric]}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ============================================================ Trend view ============================================================ */
+/* ---------------- Reusable line chart with PNG export ---------------- */
+const CHART_PALETTE = ["#8A9A8E", "#B08968", "#5C6B73", "#C08081", "#A18A68", "#7B8F77", "#9A8AA6", "#6E8A9A"];
+
+function downloadSvgAsPng(svgEl, filename) {
+  const serializer = new XMLSerializer();
+  const svgString = serializer.serializeToString(svgEl);
+  const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+  const img = new Image();
+  const bbox = svgEl.getBoundingClientRect();
+  const scale = 2; // export at 2x for sharper image
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = (svgEl.width?.baseVal?.value || bbox.width) * scale;
+    canvas.height = (svgEl.height?.baseVal?.value || bbox.height) * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#FBF9F4";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    }, "image/png");
+  };
+  img.src = url;
+}
+
+function formatChartNum(v) {
+  if (v == null) return "";
+  if (v >= 100000) return (v / 10000).toFixed(1) + "萬";
+  return v.toLocaleString();
+}
+
+function LineChartCard({ title, months, series, onDownloadName, unit }) {
+  const svgRef = useRef(null);
+  const maxVal = useMemo(() => {
+    let max = 0;
+    series.forEach((s) => s.points.forEach((v) => { if (typeof v === "number" && v > max) max = v; }));
+    return max || 1;
+  }, [series]);
+
+  const leftMargin = 64;
+  const width = Math.max(months.length * 100 + leftMargin, 480);
+  const height = 300;
+  const chartTop = 24;
+  const chartBottom = 230;
+  const chartH = chartBottom - chartTop;
+
+  const yTicks = [0, 0.25, 0.5, 0.75, 1];
+
+  return (
+    <div style={styles.card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: "#7A7568", fontWeight: 500 }}>{title}{unit ? `（單位：${unit}）` : ""}</div>
+        <button
+          style={styles.secondaryBtn}
+          onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, onDownloadName)}
+          disabled={series.length === 0}
+        >
+          <Icon name="download" size={15} />
+          下載圖表
+        </button>
+      </div>
+      {series.length === 0 ? (
+        <EmptyState text="請先在上方選擇至少一家粉絲團。" />
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <svg ref={svgRef} width={width} height={height} style={{ display: "block", background: "#FBF9F4" }}>
+            {yTicks.map((t, i) => {
+              const y = chartBottom - t * chartH;
+              const val = Math.round(maxVal * t);
+              return (
+                <g key={i}>
+                  <line x1={leftMargin} x2={width} y1={y} y2={y} stroke="#E6E1D6" strokeWidth={1} />
+                  <text x={leftMargin - 10} y={y + 4} textAnchor="end" fontSize={11} fill="#9C9684" fontFamily="'Space Grotesk', sans-serif">
+                    {formatChartNum(val)}
+                  </text>
+                </g>
+              );
+            })}
+            {series.map((s) => {
+              const points = months.map((m, i) => {
+                const v = s.points[i];
+                const x = leftMargin + 50 + i * 100;
+                const y = typeof v === "number" ? chartBottom - (v / maxVal) * chartH : null;
+                return { x, y, v };
+              });
+              const validPoints = points.filter((p) => p.y != null);
+              const path = validPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+              return (
+                <g key={s.id}>
+                  <path d={path} fill="none" stroke={s.color} strokeWidth={2} />
+                  {validPoints.map((p, i) => (
+                    <g key={i}>
+                      <circle cx={p.x} cy={p.y} r={3.5} fill={s.color} />
+                      <text x={p.x} y={p.y - 9} textAnchor="middle" fontSize={10.5} fill={s.color} fontWeight={600} fontFamily="'Space Grotesk', sans-serif">
+                        {formatChartNum(p.v)}
+                      </text>
+                    </g>
+                  ))}
+                </g>
+              );
+            })}
+            {months.map((m, i) => (
+              <text key={m} x={leftMargin + 50 + i * 100} y={chartBottom + 24} textAnchor="middle" fontSize={11} fill="#7A7568" fontFamily="'Space Grotesk', sans-serif">
+                {m}
+              </text>
+            ))}
+          </svg>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12 }}>
+            {series.map((s) => (
+              <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: s.color, display: "inline-block" }} />
+                {s.label}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const POST_METRICS = [
+  { value: "postCount", label: "貼文篇數", unit: "篇" },
+  { value: "engagement", label: "互動數", unit: "（讚+留言+分享）" },
+  { value: "views", label: "觀看數", unit: "次" },
+  { value: "likes", label: "讚數", unit: "個" },
+  { value: "comments", label: "留言數", unit: "則" },
+  { value: "shares", label: "分享數", unit: "次" },
+];
+
+/* ---------------- Horizontal bar chart (ranking) with PNG export ---------------- */
+function BarChartCard({ title, items, onDownloadName, unit, valueLabel }) {
+  const svgRef = useRef(null);
+  const maxVal = Math.max(...items.map((it) => it.value), 1);
+
+  const leftMargin = 220;
+  const rightMargin = 70;
+  const rowHeight = 34;
+  const width = 820;
+  const height = items.length * rowHeight + 30;
+  const barAreaWidth = width - leftMargin - rightMargin;
+
+  return (
+    <div style={styles.card}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: "#7A7568", fontWeight: 500 }}>{title}{unit ? `（單位：${unit}）` : ""}</div>
+        <button
+          style={styles.secondaryBtn}
+          onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, onDownloadName)}
+          disabled={items.length === 0}
+        >
+          <Icon name="download" size={15} />
+          下載圖表
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <EmptyState text="目前選定範圍內還沒有資料。" />
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <svg ref={svgRef} width={width} height={height} style={{ display: "block", background: "#FBF9F4" }}>
+            {items.map((it, i) => {
+              const y = 12 + i * rowHeight;
+              const barW = (it.value / maxVal) * barAreaWidth;
+              const color = i === 0 ? "#B08968" : "#8A9A8E";
+              return (
+                <g key={it.id}>
+                  <text x={leftMargin - 12} y={y + rowHeight / 2 + 4} textAnchor="end" fontSize={12} fill="#3A3A38">
+                    {it.label.length > 16 ? it.label.slice(0, 16) + "…" : it.label}
+                  </text>
+                  <rect x={leftMargin} y={y + 5} width={Math.max(barW, 2)} height={rowHeight - 14} rx={4} fill={color} />
+                  <text x={leftMargin + barW + 8} y={y + rowHeight / 2 + 4} fontSize={12} fill="#5C5847" fontWeight={600} fontFamily="'Space Grotesk', sans-serif">
+                    {formatChartNum(it.value)}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TrendView({ pages, fanRecords, posts }) {
+  const allMonths = useMemo(() => {
+    const set = new Set(posts.map((p) => p.month));
+    Object.values(fanRecords).forEach((entries) => {
+      (entries || []).forEach((e) => set.add((e.date || "").slice(0, 7)));
+    });
+    set.delete("");
+    return [...set].sort();
+  }, [fanRecords, posts]);
+
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+
+  useEffect(() => {
+    if (allMonths.length > 0) {
+      if (!rangeStart) setRangeStart(allMonths[0]);
+      if (!rangeEnd) setRangeEnd(allMonths[allMonths.length - 1]);
+    }
+  }, [allMonths]);
+
+  const months = useMemo(() => {
+    if (!rangeStart || !rangeEnd) return allMonths;
+    return allMonths.filter((m) => m >= rangeStart && m <= rangeEnd);
+  }, [allMonths, rangeStart, rangeEnd]);
+
+  const [selectedIds, setSelectedIds] = useState(() => pages.slice(0, 5).map((p) => p.id));
+  const [postMetric, setPostMetric] = useState("views");
+  const [pickerQuery, setPickerQuery] = useState("");
+
+  useEffect(() => {
+    setSelectedIds((ids) => ids.filter((id) => pages.some((p) => p.id === id)));
+  }, [pages]);
+
+  const toggle = (id) => {
+    setSelectedIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  };
+
+  const filteredPageOptions = useMemo(() => {
+    const q = pickerQuery.trim();
+    if (!q) return pages;
+    return pages.filter((p) => p.name.includes(q) || (p.category || "").includes(q) || (p.region || "").includes(q));
+  }, [pages, pickerQuery]);
+
+  const fanValueFor = useCallback((pageId, m) => {
+    const entry = latestInMonth(fanRecords, pageId, m);
+    return entry ? entry.count : null;
+  }, [fanRecords]);
+
+  const fanSeries = useMemo(() => {
+    return selectedIds.map((id, i) => {
+      const page = pages.find((p) => p.id === id);
+      return {
+        id,
+        label: page?.name || "（已移除）",
+        color: CHART_PALETTE[i % CHART_PALETTE.length],
+        points: months.map((m) => fanValueFor(id, m)),
+      };
+    });
+  }, [selectedIds, pages, months, fanValueFor]);
+
+  // sum of the selected metric, per page per month, within the selected date range
+  const postSeries = useMemo(() => {
+    return selectedIds.map((id, i) => {
+      const page = pages.find((p) => p.id === id);
+      return {
+        id,
+        label: page?.name || "（已移除）",
+        color: CHART_PALETTE[i % CHART_PALETTE.length],
+        points: months.map((m) => {
+          const relevant = posts.filter((p) => p.pageId === id && p.month === m);
+          if (relevant.length === 0) return null;
+          if (postMetric === "postCount") return relevant.length;
+          if (postMetric === "engagement") return relevant.reduce((sum, p) => sum + engagement(p), 0);
+          return relevant.reduce((sum, p) => sum + (Number(p[postMetric]) || 0), 0);
+        }),
+      };
+    });
+  }, [selectedIds, pages, months, posts, postMetric]);
+
+  // When the selected range covers exactly one month, show a per-dealer bar chart instead of a line chart
+  // (a trend line across a single point isn't meaningful — a ranking bar chart is more useful).
+  const singleMonth = months.length === 1;
+
+  const fanBarItems = useMemo(() => {
+    if (!singleMonth) return [];
+    return fanSeries
+      .filter((s) => typeof s.points[0] === "number")
+      .map((s) => ({ id: s.id, label: s.label, value: s.points[0] }))
+      .sort((a, b) => b.value - a.value);
+  }, [fanSeries, singleMonth]);
+
+  const postBarItems = useMemo(() => {
+    if (!singleMonth) return [];
+    return postSeries
+      .filter((s) => typeof s.points[0] === "number")
+      .map((s) => ({ id: s.id, label: s.label, value: s.points[0] }))
+      .sort((a, b) => b.value - a.value);
+  }, [postSeries, singleMonth]);
+
+  // Top 10 most-engaged posts for the range's end month (mirrors 月報表's monthly TOP10), across all pages
+  const topEngagedMonth = rangeEnd || (allMonths.length ? allMonths[allMonths.length - 1] : "");
+  const top10Engaged = useMemo(() => {
+    const pageMap = {};
+    pages.forEach((p) => (pageMap[p.id] = p));
+    return posts
+      .filter((p) => p.month === topEngagedMonth)
+      .map((p) => ({
+        id: p.id,
+        label: `${pageMap[p.pageId]?.name || "（已移除）"} · ${p.date?.slice(5) || ""}`,
+        value: engagement(p),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [posts, pages, topEngagedMonth]);
+
+  return (
+    <div style={styles.viewWrap}>
+      <Header title="趨勢總覽" subtitle="跨月份比較粉絲人數與貼文數據變化" />
+
+      {pages.length === 0 ? (
+        <div style={styles.card}><EmptyState text="尚無粉絲團，請先新增。" /></div>
+      ) : allMonths.length === 0 ? (
+        <div style={styles.card}><EmptyState text="尚無任何月份的資料，先到「本月輸入」記錄看看。" /></div>
+      ) : (
+        <>
+          <div style={styles.card}>
+            <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "1fr 1fr 2fr" }}>
+              <Field label="起始月份">
+                <select style={styles.input} value={rangeStart} onChange={(e) => setRangeStart(e.target.value)}>
+                  {allMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+                </select>
+              </Field>
+              <Field label="結束月份">
+                <select style={styles.input} value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)}>
+                  {allMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+                </select>
+              </Field>
+              <div style={{ display: "flex", alignItems: "flex-end" }}>
+                <div style={{ fontSize: 12.5, color: "#9C9684" }}>
+                  目前顯示範圍：{months.length > 0 ? `${monthLabel(months[0])} ～ ${monthLabel(months[months.length - 1])}（共 ${months.length} 個月）` : "無資料"}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={styles.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 13, color: "#7A7568" }}>
+                選擇要比較的粉絲團（可複選，已選 {selectedIds.length} / {pages.length} 家）
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={styles.secondaryBtn} onClick={() => setSelectedIds(filteredPageOptions.map((p) => p.id))}>全選</button>
+                <button style={styles.secondaryBtn} onClick={() => setSelectedIds([])}>全取消</button>
+              </div>
+            </div>
+            <input
+              style={{ ...styles.input, marginBottom: 10 }}
+              placeholder="搜尋粉絲團名稱、法人或地區，篩選下方清單…"
+              value={pickerQuery}
+              onChange={(e) => setPickerQuery(e.target.value)}
+            />
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxHeight: 220, overflowY: "auto" }}>
+              {filteredPageOptions.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: "#A6A096" }}>沒有符合搜尋條件的粉絲團</div>
+              ) : (
+                filteredPageOptions.map((p) => {
+                  const active = selectedIds.includes(p.id);
+                  const idx = selectedIds.indexOf(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => toggle(p.id)}
+                      style={{
+                        ...styles.chipBtn,
+                        ...(active ? { background: CHART_PALETTE[idx % CHART_PALETTE.length], color: "#fff", borderColor: "transparent" } : {}),
+                      }}
+                    >
+                      {p.name}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {singleMonth ? (
+            <BarChartCard
+              title={`粉絲人數（${months[0] ? monthLabel(months[0]) : "—"}，依粉絲團排名）`}
+              items={fanBarItems}
+              onDownloadName={`粉絲人數_${months[0]}.png`}
+              unit="人"
+            />
+          ) : (
+            <LineChartCard
+              title="粉絲人數趨勢（每月取最新一筆量測值）"
+              months={months}
+              series={fanSeries}
+              onDownloadName={`粉絲人數趨勢_${rangeStart}_${rangeEnd}.png`}
+              unit="人"
+            />
+          )}
+
+          <div style={styles.card}>
+            <div style={styles.filterLabel}>貼文數據指標</div>
+            <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+              {POST_METRICS.map((m) => (
+                <button
+                  key={m.value}
+                  style={{ ...styles.chipBtn, ...(postMetric === m.value ? styles.chipBtnActive : {}) }}
+                  onClick={() => setPostMetric(m.value)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {singleMonth ? (
+            <BarChartCard
+              title={`貼文${POST_METRICS.find((m) => m.value === postMetric)?.label}（${months[0] ? monthLabel(months[0]) : "—"}，依粉絲團排名）`}
+              items={postBarItems}
+              onDownloadName={`貼文${POST_METRICS.find((m) => m.value === postMetric)?.label}_${months[0]}.png`}
+              unit={POST_METRICS.find((m) => m.value === postMetric)?.unit}
+            />
+          ) : (
+            <LineChartCard
+              title={`貼文${POST_METRICS.find((m) => m.value === postMetric)?.label}趨勢（每月總和，所選粉絲團）`}
+              months={months}
+              series={postSeries}
+              onDownloadName={`貼文${POST_METRICS.find((m) => m.value === postMetric)?.label}趨勢_${rangeStart}_${rangeEnd}.png`}
+              unit={POST_METRICS.find((m) => m.value === postMetric)?.unit}
+            />
+          )}
+
+          <BarChartCard
+            title={`本月最高互動貼文 TOP 10（${topEngagedMonth ? monthLabel(topEngagedMonth) : "—"}，所有粉絲團，讚+留言+分享）`}
+            items={top10Engaged}
+            onDownloadName={`最高互動貼文TOP10_${topEngagedMonth}.png`}
+            unit="互動數"
+          />
+
+          <PostDetailChartSection pages={pages} posts={posts} allMonths={allMonths} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Single-page single-month post detail chart (date-level) ---------------- */
+function PostDetailChartSection({ pages, posts, allMonths }) {
+  const [detailPageId, setDetailPageId] = useState(pages[0]?.id || "");
+  const [detailMonth, setDetailMonth] = useState(allMonths[allMonths.length - 1] || "");
+  const [detailMetric, setDetailMetric] = useState("engagement");
+  const svgRef = useRef(null);
+
+  useEffect(() => {
+    if (!detailPageId && pages.length) setDetailPageId(pages[0].id);
+  }, [pages, detailPageId]);
+
+  useEffect(() => {
+    if (!detailMonth && allMonths.length) setDetailMonth(allMonths[allMonths.length - 1]);
+  }, [allMonths, detailMonth]);
+
+  const detailPosts = useMemo(() => {
+    return posts
+      .filter((p) => p.pageId === detailPageId && p.month === detailMonth)
+      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  }, [posts, detailPageId, detailMonth]);
+
+  const detailPage = pages.find((p) => p.id === detailPageId);
+  const metricInfo = POST_METRICS.find((m) => m.value === detailMetric) || POST_METRICS[1];
+
+  const leftMargin = 64;
+  const pointGap = 110;
+  const width = Math.max(detailPosts.length * pointGap + leftMargin + 60, 480);
+  const height = 320;
+  const chartTop = 24;
+  const chartBottom = 240;
+  const chartH = chartBottom - chartTop;
+
+  const values = detailPosts.map((p) => {
+    if (detailMetric === "postCount") return 1;
+    if (detailMetric === "engagement") return engagement(p);
+    return Number(p[detailMetric]) || 0;
+  });
+  const maxVal = Math.max(...values, 1);
+  const yTicks = [0, 0.25, 0.5, 0.75, 1];
+
+  return (
+    <>
+      <SectionTitle icon="spark" title="單月貼文明細（依日期排列，每篇貼文獨立顯示）" />
+      <div style={styles.card}>
+        <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "1fr 1fr 2fr" }}>
+          <Field label="粉絲團">
+            <select style={styles.input} value={detailPageId} onChange={(e) => setDetailPageId(e.target.value)}>
+              {pages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </Field>
+          <Field label="月份">
+            <select style={styles.input} value={detailMonth} onChange={(e) => setDetailMonth(e.target.value)}>
+              {allMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+          </Field>
+          <Field label="指標">
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {POST_METRICS.filter((m) => m.value !== "postCount").map((m) => (
+                <button
+                  key={m.value}
+                  style={{ ...styles.chipBtn, ...(detailMetric === m.value ? styles.chipBtnActive : {}), padding: "5px 11px", fontSize: 12 }}
+                  onClick={() => setDetailMetric(m.value)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+      </div>
+
+      <div style={styles.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: "#7A7568", fontWeight: 500 }}>
+            {detailPage?.name || "—"} · {detailMonth ? monthLabel(detailMonth) : "—"} · {metricInfo.label}
+            （單位：{metricInfo.unit}，共 {detailPosts.length} 篇貼文）
+          </div>
+          <button
+            style={styles.secondaryBtn}
+            onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, `${detailPage?.name || "粉絲團"}_${detailMonth}_${metricInfo.label}明細.png`)}
+            disabled={detailPosts.length === 0}
+          >
+            <Icon name="download" size={15} />
+            下載圖表
+          </button>
+        </div>
+
+        {detailPosts.length === 0 ? (
+          <EmptyState text="這個粉絲團在所選月份還沒有貼文紀錄。" />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <svg ref={svgRef} width={width} height={height} style={{ display: "block", background: "#FBF9F4" }}>
+              {yTicks.map((t, i) => {
+                const y = chartBottom - t * chartH;
+                const val = Math.round(maxVal * t);
+                return (
+                  <g key={i}>
+                    <line x1={leftMargin} x2={width} y1={y} y2={y} stroke="#E6E1D6" strokeWidth={1} />
+                    <text x={leftMargin - 10} y={y + 4} textAnchor="end" fontSize={11} fill="#9C9684" fontFamily="'Space Grotesk', sans-serif">
+                      {formatChartNum(val)}
+                    </text>
+                  </g>
+                );
+              })}
+              {(() => {
+                const points = detailPosts.map((p, i) => {
+                  const v = values[i];
+                  const x = leftMargin + 55 + i * pointGap;
+                  const y = chartBottom - (v / maxVal) * chartH;
+                  return { x, y, v, post: p };
+                });
+                const path = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+                return (
+                  <g>
+                    <path d={path} fill="none" stroke="#8A9A8E" strokeWidth={2} />
+                    {points.map((p, i) => (
+                      <g key={i}>
+                        <circle cx={p.x} cy={p.y} r={4.5} fill="#8A9A8E" />
+                        <text x={p.x} y={p.y - 12} textAnchor="middle" fontSize={11} fill="#5C6B73" fontWeight={600} fontFamily="'Space Grotesk', sans-serif">
+                          {formatChartNum(p.v)}
+                        </text>
+                        <text x={p.x} y={chartBottom + 22} textAnchor="middle" fontSize={11} fill="#7A7568" fontFamily="'Space Grotesk', sans-serif">
+                          {p.post.date?.slice(5)}
+                        </text>
+                        <text x={p.x} y={chartBottom + 38} textAnchor="middle" fontSize={10} fill="#A6A096">
+                          {POST_TYPES.find((t) => t.value === p.post.type)?.label}
+                        </text>
+                      </g>
+                    ))}
+                  </g>
+                );
+              })()}
+            </svg>
+            <div style={styles.hint}>X軸為貼文發布日期（月-日），每個點代表一篇獨立貼文；同一天若有多篇貼文，會依序並排顯示。</div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ============================================================ Shared UI bits ============================================================ */
+function Header({ title, subtitle, children }) {
+  return (
+    <div style={styles.headerRow}>
+      <div>
+        <h1 style={styles.h1}>{title}</h1>
+        <div style={styles.subtitle}>{subtitle}</div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ icon, title }) {
+  return (
+    <div style={styles.sectionTitle}>
+      <Icon name={icon} size={16} />
+      <span>{title}</span>
+    </div>
+  );
+}
+
+function Field({ label, children, style }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 5, ...style }}>
+      <label style={styles.fieldLabel}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, tone }) {
+  const color = tone === "good" ? "#7B8F77" : tone === "bad" ? "#C08081" : "#3A3A38";
+  return (
+    <div style={styles.statCard}>
+      <div style={styles.statIcon}><Icon name={icon} size={18} /></div>
+      <div>
+        <div style={styles.statLabel}>{label}</div>
+        <div style={{ ...styles.statValue, color }}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+function MonthSwitcher({ month, setMonth }) {
+  return (
+    <div style={styles.monthSwitcher}>
+      <button style={styles.iconBtn} onClick={() => setMonth(shiftMonth(month, -1))}>
+        <Icon name="chevronLeft" size={16} />
+      </button>
+      <span style={styles.monthLabel}>{monthLabel(month)}</span>
+      <button style={styles.iconBtn} onClick={() => setMonth(shiftMonth(month, 1))}>
+        <Icon name="chevronRight" size={16} />
+      </button>
+    </div>
+  );
+}
+
+function EmptyState({ text }) {
+  return <div style={styles.emptyState}>{text}</div>;
+}
+
+function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }) {
+  return (
+    <div style={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div style={{ ...styles.modalCard, maxWidth: 440 }}>
+        <div style={styles.modalHeader}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <Icon name="trash" size={17} />
+            <span style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 17 }}>{title}</span>
+          </div>
+          <button style={styles.iconBtn} onClick={onCancel}><Icon name="x" size={18} /></button>
+        </div>
+        <div style={styles.modalBody}>
+          <p style={{ fontSize: 13.5, color: "#5C5847", lineHeight: 1.7, margin: 0 }}>{message}</p>
+        </div>
+        <div style={styles.modalFooter}>
+          <button style={styles.secondaryBtn} onClick={onCancel}>取消</button>
+          <button style={{ ...styles.primaryBtn, background: "#C08081" }} onClick={onConfirm}>
+            {confirmLabel || "確認刪除"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ Styles ============================================================ */
+const styles = {
+  shell: {
+    display: "flex",
+    minHeight: "100vh",
+    background: "#F3F0EA",
+    color: "#3A3A38",
+    fontFamily: "'Noto Sans TC', sans-serif",
+  },
+  sidebar: {
+    width: 240,
+    flexShrink: 0,
+    background: "#EBE6D9",
+    borderRight: "1px solid #DDD6C6",
+    display: "flex",
+    flexDirection: "column",
+    padding: "24px 18px",
+  },
+  brand: { display: "flex", alignItems: "center", gap: 10, marginBottom: 26, paddingLeft: 4 },
+  brandMark: {
+    width: 34, height: 34, borderRadius: 9, background: "#8A9A8E", color: "#F3F0EA",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 15, flexShrink: 0,
+  },
+  brandTitle: { fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 15, lineHeight: 1.3 },
+  brandSub: { fontSize: 11.5, color: "#8C8674", fontFamily: "'Space Grotesk', sans-serif", marginTop: 1 },
+  navList: { display: "flex", flexDirection: "column", gap: 3 },
+  navItem: {
+    display: "flex", alignItems: "center", gap: 10,
+    padding: "9px 12px", borderRadius: 8, border: "none", background: "transparent",
+    color: "#5C5847", fontSize: 14, cursor: "pointer", textAlign: "left",
+    fontFamily: "'Noto Sans TC', sans-serif",
+  },
+  navItemActive: { background: "#F3F0EA", color: "#3A3A38", fontWeight: 500, boxShadow: "0 1px 2px rgba(0,0,0,0.06)" },
+  sidebarFoot: { marginTop: "auto", fontSize: 11.5, color: "#A39D8A", lineHeight: 1.6, paddingTop: 20 },
+
+  main: { flex: 1, minWidth: 0, overflowY: "auto", padding: "36px 48px 70px" },
+  viewWrap: { maxWidth: 1140, margin: "0 auto", display: "flex", flexDirection: "column", gap: 24 },
+
+  headerRow: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 14 },
+  h1: { fontFamily: "'Noto Serif TC', serif", fontSize: 25, fontWeight: 700, margin: 0, color: "#33312C" },
+  subtitle: { fontSize: 13.5, color: "#8C8674", marginTop: 4 },
+
+  card: { background: "#FBF9F4", border: "1px solid #E6E1D6", borderRadius: 14, padding: 22 },
+  cardHeadRow: { padding: "13px 22px", borderBottom: "1px solid #E6E1D6", fontSize: 13.5, color: "#7A7568", fontWeight: 500 },
+
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: 14,
+    alignItems: "end",
+  },
+
+  input: {
+    width: "100%", padding: "9px 11px", borderRadius: 8, border: "1px solid #DDD6C6",
+    background: "#fff", fontSize: 13.5, color: "#3A3A38",
+  },
+  fieldLabel: { fontSize: 11.5, color: "#9C9684", fontWeight: 500, letterSpacing: 0.2 },
+
+  primaryBtn: {
+    display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8,
+    background: "#8A9A8E", color: "#fff", border: "none", fontSize: 13.5, fontWeight: 500,
+    cursor: "pointer", whiteSpace: "nowrap", height: 38,
+  },
+  secondaryBtn: {
+    display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 8,
+    background: "#fff", color: "#5C5847", border: "1px solid #DDD6C6", fontSize: 13.5, fontWeight: 500,
+    cursor: "pointer", whiteSpace: "nowrap", height: 38,
+  },
+  iconBtn: {
+    border: "none", background: "transparent", color: "#8C8674", cursor: "pointer",
+    padding: 6, borderRadius: 6, display: "inline-flex", alignItems: "center",
+  },
+
+  modalOverlay: {
+    position: "fixed", inset: 0, background: "rgba(58,58,56,0.42)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 24,
+  },
+  modalCard: {
+    background: "#FBF9F4", borderRadius: 16, width: "100%", maxWidth: 640, maxHeight: "85vh",
+    display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", overflow: "hidden",
+  },
+  modalHeader: {
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    padding: "16px 20px", borderBottom: "1px solid #E6E1D6", flexShrink: 0,
+  },
+  modalBody: { padding: "18px 20px", overflowY: "auto", flex: 1 },
+  modalFooter: {
+    display: "flex", justifyContent: "flex-end", gap: 10,
+    padding: "14px 20px", borderTop: "1px solid #E6E1D6", flexShrink: 0,
+  },
+  dropZone: {
+    border: "1.5px dashed #DDD6C6", borderRadius: 12, padding: "34px 20px",
+    textAlign: "center", color: "#9C9684", cursor: "pointer", background: "#fff",
+  },
+  errorBox: {
+    marginTop: 12, padding: "10px 14px", borderRadius: 8, background: "#F7E9E8",
+    color: "#A85D5D", fontSize: 13,
+  },
+  promptTextarea: {
+    width: "100%", minHeight: 280, padding: "14px 16px", borderRadius: 10,
+    border: "1px solid #DDD6C6", background: "#fff", fontSize: 12.5, lineHeight: 1.7,
+    color: "#3A3A38", fontFamily: "'Space Grotesk', 'Noto Sans TC', monospace",
+    resize: "vertical", whiteSpace: "pre-wrap",
+  },
+  storageWarning: {
+    maxWidth: 1140, margin: "0 auto 20px", padding: "12px 16px", borderRadius: 10,
+    background: "#FBF1DE", color: "#9C7A3D", fontSize: 13, lineHeight: 1.7,
+  },
+  warnBox: {
+    marginBottom: 14, padding: "10px 14px", borderRadius: 8, background: "#FBF1DE",
+    color: "#9C7A3D", fontSize: 12.5, lineHeight: 1.6,
+  },
+  importStatRow: { display: "flex", gap: 18, marginBottom: 14, fontSize: 13 },
+  importStat: { color: "#5C5847" },
+  importPreviewTableWrap: {
+    border: "1px solid #E6E1D6", borderRadius: 10, maxHeight: 320, overflowY: "auto",
+  },
+  tagGood: { fontSize: 11, background: "#E6EBE3", color: "#7B8F77", padding: "2px 8px", borderRadius: 6, fontWeight: 500 },
+  tagWarn: { fontSize: 11, background: "#FBF1DE", color: "#9C7A3D", padding: "2px 8px", borderRadius: 6, fontWeight: 500 },
+  tagBad: { fontSize: 11, background: "#F7E9E8", color: "#A85D5D", padding: "2px 8px", borderRadius: 6, fontWeight: 500 },
+
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 13.5 },
+  th: { textAlign: "left", padding: "11px 18px", color: "#9C9684", fontWeight: 500, fontSize: 12, borderBottom: "1px solid #E6E1D6", whiteSpace: "nowrap" },
+  thSubLabel: { fontSize: 10, color: "#B0A98F", fontWeight: 400 },
+  tr: { borderBottom: "1px solid #EFEAE0" },
+  td: { padding: "11px 18px", color: "#3A3A38" },
+  tag: { fontSize: 11.5, background: "#EBE6D9", color: "#7A7568", padding: "2px 8px", borderRadius: 6 },
+  typeTag: { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#7A7568" },
+  link: { display: "inline-flex", alignItems: "center", gap: 4, color: "#8A9A8E", textDecoration: "none", fontSize: 12.5 },
+
+  emptyState: { padding: "40px 20px", textAlign: "center", color: "#A39D8A", fontSize: 13.5 },
+  hint: { fontSize: 12, color: "#A39D8A", marginTop: 10 },
+
+  tabRow: { display: "flex", gap: 6, borderBottom: "1px solid #DDD6C6", paddingBottom: 0 },
+  tabBtn: {
+    padding: "9px 4px", marginRight: 18, border: "none", background: "transparent",
+    color: "#9C9684", fontSize: 14, cursor: "pointer", borderBottom: "2px solid transparent",
+    fontFamily: "'Noto Sans TC', sans-serif",
+  },
+  tabBtnActive: { color: "#3A3A38", fontWeight: 600, borderBottom: "2px solid #8A9A8E" },
+
+  statRow: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 },
+  statCard: {
+    display: "flex", alignItems: "center", gap: 12, background: "#FBF9F4",
+    border: "1px solid #E6E1D6", borderRadius: 14, padding: "16px 18px",
+  },
+  statIcon: {
+    width: 36, height: 36, borderRadius: 9, background: "#EBE6D9", color: "#8A9A8E",
+    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+  },
+  statLabel: { fontSize: 12, color: "#9C9684" },
+  statValue: { fontSize: 21, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500, marginTop: 1 },
+
+  sectionTitle: {
+    display: "flex", alignItems: "center", gap: 8, fontSize: 14.5, fontWeight: 600,
+    color: "#5C5847", marginTop: 6,
+  },
+
+  monthSwitcher: {
+    display: "flex", alignItems: "center", gap: 4, background: "#EBE6D9",
+    borderRadius: 9, padding: "4px 6px",
+  },
+  monthLabel: { fontSize: 13.5, fontWeight: 500, minWidth: 78, textAlign: "center", fontFamily: "'Space Grotesk', sans-serif" },
+
+  chipBtn: {
+    padding: "6px 13px", borderRadius: 999, border: "1px solid #DDD6C6", background: "#fff",
+    color: "#5C5847", fontSize: 12.5, cursor: "pointer",
+  },
+  chipBtnActive: {
+    background: "#5C6B73", color: "#fff", borderColor: "transparent",
+  },
+  filterLabel: { fontSize: 12, color: "#9C9684", marginBottom: 8, fontWeight: 500 },
+
+  toast: {
+    position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+    background: "#3A3A38", color: "#F3F0EA", padding: "10px 20px", borderRadius: 10,
+    fontSize: 13.5, boxShadow: "0 6px 20px rgba(0,0,0,0.18)", zIndex: 50,
+  },
+};
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+<script>
+  // Manually transform with the CLASSIC JSX runtime (React.createElement calls),
+  // because Babel's default "automatic" runtime emits an `import` statement that
+  // plain <script> tags (no module system) cannot execute, which silently breaks
+  // the whole page (shows as blank with a "Cannot use import statement" console error).
+  (function () {
+    var source = document.getElementById("app-source").textContent;
+    var output = Babel.transform(source, {
+      presets: [["react", { runtime: "classic" }], "env"],
+    }).code;
+    var script = document.createElement("script");
+    script.text = output;
+    document.body.appendChild(script);
+  })();
+</script>
+</body>
+</html>
