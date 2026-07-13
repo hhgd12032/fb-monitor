@@ -30,6 +30,7 @@ const STORAGE_KEYS = {
   PAGES: "fbmonitor:pages",
   FAN_RECORDS: "fbmonitor:fanrecords",
   POSTS: "fbmonitor:posts",
+  GROUP_RECORDS: "fbmonitor:grouprecords",
 };
 
 const POST_TYPES = [
@@ -184,12 +185,13 @@ function App() {
   const [pages, setPages, persistPages, pagesLoaded] = useStoredState(STORAGE_KEYS.PAGES, []);
   const [fanRecords, setFanRecords, persistFanRecords, frLoaded] = useStoredState(STORAGE_KEYS.FAN_RECORDS, {});
   const [posts, setPosts, persistPosts, postsLoaded] = useStoredState(STORAGE_KEYS.POSTS, []);
+  const [groupRecords, setGroupRecords, persistGroupRecords, grLoaded] = useStoredState(STORAGE_KEYS.GROUP_RECORDS, {});
   const [storageOK] = useState(isStorageAvailable);
 
   const [view, setView] = useState("input"); // input | report | trend | pages
   const [month, setMonth] = useState(nowMonth());
   const [toast, setToast] = useState(null);
-  const allLoaded = pagesLoaded && frLoaded && postsLoaded;
+  const allLoaded = pagesLoaded && frLoaded && postsLoaded && grLoaded;
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -210,6 +212,11 @@ function App() {
     setPosts(next);
     persistPosts(next);
   }, [persistPosts, setPosts]);
+
+  const saveGroupRecords = useCallback((next) => {
+    setGroupRecords(next);
+    persistGroupRecords(next);
+  }, [persistGroupRecords, setGroupRecords]);
 
   const pageMap = useMemo(() => {
     const m = {};
@@ -246,6 +253,8 @@ function App() {
             saveFanRecords={saveFanRecords}
             posts={posts}
             savePosts={savePosts}
+            groupRecords={groupRecords}
+            saveGroupRecords={saveGroupRecords}
           />
         )}
         {view === "input" && (
@@ -271,7 +280,7 @@ function App() {
           />
         )}
         {view === "trend" && (
-          <TrendView pages={pages} fanRecords={fanRecords} posts={posts} />
+          <TrendView pages={pages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords} />
         )}
       </main>
       {toast && <div style={styles.toast}>{toast}</div>}
@@ -600,7 +609,7 @@ function ImportModal({ onClose, onConfirm, existingPages }) {
   );
 }
 
-function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, posts, savePosts }) {
+function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, posts, savePosts, groupRecords, saveGroupRecords }) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [region, setRegion] = useState("");
@@ -617,8 +626,15 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
   const [pendingRestore, setPendingRestore] = useState(null); // parsed backup object awaiting confirmation
   const [restoreError, setRestoreError] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState(null); // page id awaiting delete confirmation
+  const [groupMonth, setGroupMonth] = useState(nowMonth()); // which month's group assignments to show/edit
+  const [filterGroup, setFilterGroup] = useState(""); // "" | "A" | "B" | "C" | "none"
   const restoreInputRef = useRef(null);
   const inputRef = useRef(null);
+
+  const setGroupForPage = (pageId, group) => {
+    const monthGroups = { ...(groupRecords[groupMonth] || {}), [pageId]: group };
+    saveGroupRecords({ ...groupRecords, [groupMonth]: monthGroups });
+  };
 
   const addPage = () => {
     const trimmed = name.trim();
@@ -670,11 +686,28 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
   const categories = useMemo(() => [...new Set(pages.map((p) => p.category).filter(Boolean))].sort(), [pages]);
   const regions = useMemo(() => [...new Set(pages.map((p) => p.region).filter(Boolean))].sort(), [pages]);
 
+  const groupCounts = useMemo(() => {
+    const mg = groupRecords[groupMonth] || {};
+    const counts = { A: 0, B: 0, C: 0, none: 0 };
+    pages.forEach((p) => {
+      const g = mg[p.id] || "";
+      if (g === "A" || g === "B" || g === "C") counts[g]++;
+      else counts.none++;
+    });
+    return counts;
+  }, [groupRecords, groupMonth, pages]);
+
   const filtered = pages.filter((p) => {
     const matchesQuery = p.name.includes(query) || (p.category || "").includes(query) || (p.region || "").includes(query);
     const matchesCategory = !filterCategory || p.category === filterCategory;
     const matchesRegion = !filterRegion || p.region === filterRegion;
-    return matchesQuery && matchesCategory && matchesRegion;
+    const currentGroup = groupRecords[groupMonth]?.[p.id] || "";
+    const matchesGroup = !filterGroup
+      ? true
+      : filterGroup === "none"
+        ? !currentGroup
+        : currentGroup === filterGroup;
+    return matchesQuery && matchesCategory && matchesRegion && matchesGroup;
   });
   const currentMonth = nowMonth();
 
@@ -687,6 +720,7 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
       pages,
       fanRecords,
       posts,
+      groupRecords,
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -720,6 +754,7 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
     savePages(pendingRestore.pages || []);
     saveFanRecords(pendingRestore.fanRecords || {});
     savePosts(pendingRestore.posts || []);
+    saveGroupRecords(pendingRestore.groupRecords || {});
     showToast("已從備份還原所有資料");
     setPendingRestore(null);
   };
@@ -898,6 +933,34 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
         </div>
       )}
 
+      <div style={styles.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#3A3A38", marginBottom: 2 }}>競賽分組設定</div>
+            <div style={{ fontSize: 12.5, color: "#9C9684" }}>每個月份獨立設定，不同月份的分組互不影響</div>
+          </div>
+          <MonthSwitcher month={groupMonth} setMonth={setGroupMonth} />
+        </div>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 4 }}>
+          {[
+            { key: "", label: "全部" },
+            { key: "A", label: `A 組（${groupCounts.A}）` },
+            { key: "B", label: `B 組（${groupCounts.B}）` },
+            { key: "C", label: `C 組（${groupCounts.C}）` },
+            { key: "none", label: `未參加（${groupCounts.none}）` },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              style={{ ...styles.chipBtn, ...(filterGroup === key ? styles.chipBtnActive : {}) }}
+              onClick={() => setFilterGroup(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={styles.hint}>點擊組別標籤可篩選下方清單；在下方表格的「組別」欄直接下拉選擇即可設定。</div>
+      </div>
+
       <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "14px 18px", borderBottom: "1px solid #E6E1D6", display: "flex", alignItems: "center", gap: 8 }}>
           <Icon name="search" size={15} className="" />
@@ -917,6 +980,7 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
                 <th style={styles.th}>粉絲團</th>
                 <th style={{ ...styles.th, width: 90 }}>法人</th>
                 <th style={{ ...styles.th, width: 90 }}>地區</th>
+                <th style={{ ...styles.th, textAlign: "center", width: 110, whiteSpace: "nowrap" }}>{monthLabel(groupMonth)}<br /><span style={styles.thSubLabel}>競賽組別</span></th>
                 <th style={{ ...styles.th, textAlign: "right", width: 130, whiteSpace: "nowrap" }}>最新粉絲數</th>
                 <th style={{ ...styles.th, width: 90 }}></th>
               </tr>
@@ -924,6 +988,8 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
             <tbody>
               {filtered.map((p) => {
                 const latest = latestInMonth(fanRecords, p.id, currentMonth);
+                const group = groupRecords[groupMonth]?.[p.id] || "";
+                const groupColor = group === "A" ? "#5C6B73" : group === "B" ? "#B08968" : group === "C" ? "#8A9A8E" : "#A6A096";
                 return (
                   <tr key={p.id} style={styles.tr}>
                     <td style={styles.td}>
@@ -978,6 +1044,24 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
                     </td>
                     <td style={styles.td}>
                       {editingId !== p.id && <span style={styles.tag}>{p.region || "—"}</span>}
+                    </td>
+                    <td style={{ ...styles.td, textAlign: "center" }}>
+                      {editingId !== p.id && (
+                        <select
+                          style={{
+                            padding: "5px 8px", borderRadius: 7, border: "1px solid #DDD6C6",
+                            background: "#fff", fontSize: 12.5, cursor: "pointer",
+                            fontWeight: group ? 600 : 400, color: groupColor,
+                          }}
+                          value={group}
+                          onChange={(e) => setGroupForPage(p.id, e.target.value)}
+                        >
+                          <option value="">—</option>
+                          <option value="A">A 組</option>
+                          <option value="B">B 組</option>
+                          <option value="C">C 組</option>
+                        </select>
+                      )}
                     </td>
                     <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>
                       {latest ? latest.count.toLocaleString() : "—"}
@@ -2019,7 +2103,7 @@ function BarChartCard({ title, items, onDownloadName, unit, valueLabel }) {
   );
 }
 
-function TrendView({ pages, fanRecords, posts }) {
+function TrendView({ pages, fanRecords, posts, groupRecords }) {
   const allMonths = useMemo(() => {
     const set = new Set(posts.map((p) => p.month));
     Object.values(fanRecords).forEach((entries) => {
@@ -2047,6 +2131,48 @@ function TrendView({ pages, fanRecords, posts }) {
   const [selectedIds, setSelectedIds] = useState(() => pages.slice(0, 5).map((p) => p.id));
   const [postMetric, setPostMetric] = useState("views");
   const [pickerQuery, setPickerQuery] = useState("");
+  const [activeGroupFilter, setActiveGroupFilter] = useState(""); // "" | "A" | "B" | "C"
+
+  // User explicitly picks which month's group assignments to use for the quick-filter
+  // (independent of the chart date range — you may want to compare trends but filter by this month's groups)
+  const [groupRefMonth, setGroupRefMonth] = useState(nowMonth);
+
+  // Months that have any group assignments set — used to populate the group-ref-month picker
+  const monthsWithGroupData = useMemo(() => {
+    const months = Object.keys(groupRecords).filter((m) => {
+      const mg = groupRecords[m] || {};
+      return Object.values(mg).some((g) => g);
+    });
+    return months.sort();
+  }, [groupRecords]);
+
+  // IDs of pages belonging to a given group in the reference month
+  const pageIdsInGroup = useCallback((group) => {
+    if (!group || !groupRefMonth) return pages.map((p) => p.id);
+    const monthGroups = groupRecords[groupRefMonth] || {};
+    return pages.filter((p) => monthGroups[p.id] === group).map((p) => p.id);
+  }, [pages, groupRecords, groupRefMonth]);
+
+  // Whether any group assignments exist for the reference month
+  const hasGroupData = useMemo(() => {
+    if (!groupRefMonth) return false;
+    const mg = groupRecords[groupRefMonth] || {};
+    return Object.values(mg).some((g) => g);
+  }, [groupRecords, groupRefMonth]);
+
+  // Group counts for the reference month
+  const groupCounts = useMemo(() => {
+    const mg = groupRecords[groupRefMonth] || {};
+    const counts = { A: 0, B: 0, C: 0 };
+    Object.values(mg).forEach((g) => { if (counts[g] !== undefined) counts[g]++; });
+    return counts;
+  }, [groupRecords, groupRefMonth]);
+
+  const applyGroupFilter = (group) => {
+    setActiveGroupFilter(group);
+    if (!group) return; // keep current selection when clearing filter
+    setSelectedIds(pageIdsInGroup(group));
+  };
 
   useEffect(() => {
     setSelectedIds((ids) => ids.filter((id) => pages.some((p) => p.id === id)));
@@ -2174,6 +2300,66 @@ function TrendView({ pages, fanRecords, posts }) {
                 <button style={styles.secondaryBtn} onClick={() => setSelectedIds([])}>全取消</button>
               </div>
             </div>
+
+            <div style={{ marginBottom: 14, padding: "12px 14px", background: "#F3F0EA", borderRadius: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: hasGroupData ? 10 : 0 }}>
+                <div style={{ ...styles.filterLabel, marginBottom: 0 }}>依競賽組別快速選取</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: "#9C9684" }}>參考月份：</span>
+                  {monthsWithGroupData.length > 0 ? (
+                    <select
+                      style={{ ...styles.input, padding: "4px 8px", fontSize: 12.5, width: "auto" }}
+                      value={groupRefMonth}
+                      onChange={(e) => { setGroupRefMonth(e.target.value); setActiveGroupFilter(""); }}
+                    >
+                      {monthsWithGroupData.map((m) => (
+                        <option key={m} value={m}>{monthLabel(m)}</option>
+                      ))}
+                      {!monthsWithGroupData.includes(groupRefMonth) && (
+                        <option value={groupRefMonth}>{monthLabel(groupRefMonth)}（尚未設定）</option>
+                      )}
+                    </select>
+                  ) : (
+                    <span style={{ fontSize: 12, color: "#A6A096" }}>尚無分組資料</span>
+                  )}
+                </div>
+              </div>
+
+              {hasGroupData ? (
+                <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
+                  {["A", "B", "C"].map((g) => {
+                    const count = groupCounts[g];
+                    return (
+                      <button
+                        key={g}
+                        style={{
+                          ...styles.chipBtn,
+                          ...(activeGroupFilter === g ? { background: "#5C6B73", color: "#fff", borderColor: "transparent" } : {}),
+                          ...(count === 0 ? { opacity: 0.4, cursor: "default" } : {}),
+                        }}
+                        onClick={() => count > 0 && applyGroupFilter(activeGroupFilter === g ? "" : g)}
+                        title={count === 0 ? `${g}組在 ${monthLabel(groupRefMonth)} 無成員` : `選取${g}組（${count}家）`}
+                      >
+                        {g} 組（{count}）
+                      </button>
+                    );
+                  })}
+                  {activeGroupFilter && (
+                    <button
+                      style={{ ...styles.chipBtn, color: "#C08081", borderColor: "#C08081" }}
+                      onClick={() => setActiveGroupFilter("")}
+                    >
+                      清除篩選
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: "#A6A096", lineHeight: 1.6 }}>
+                  所選月份尚未設定競賽分組——請到「粉絲團清單」→「競賽分組設定」，選好月份後在每家旁邊設定 A/B/C 組。
+                </div>
+              )}
+            </div>
+
             <input
               style={{ ...styles.input, marginBottom: 10 }}
               placeholder="搜尋粉絲團名稱、法人或地區，篩選下方清單…"
@@ -2187,16 +2373,17 @@ function TrendView({ pages, fanRecords, posts }) {
                 filteredPageOptions.map((p) => {
                   const active = selectedIds.includes(p.id);
                   const idx = selectedIds.indexOf(p.id);
+                  const group = groupRecords[groupRefMonth]?.[p.id];
                   return (
                     <button
                       key={p.id}
-                      onClick={() => toggle(p.id)}
+                      onClick={() => { toggle(p.id); setActiveGroupFilter(""); }}
                       style={{
                         ...styles.chipBtn,
                         ...(active ? { background: CHART_PALETTE[idx % CHART_PALETTE.length], color: "#fff", borderColor: "transparent" } : {}),
                       }}
                     >
-                      {p.name}
+                      {p.name}{group ? ` · ${group}` : ""}
                     </button>
                   );
                 })
