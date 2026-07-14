@@ -288,7 +288,7 @@ function App() {
     <div style={styles.shell}>
       <style>{fontImports}</style>
       <Sidebar view={view} setView={setView} pageCount={pages.length} />
-      <main style={styles.main}>
+      <main className="fbm-main" style={styles.main}>
         {view === "pages" && (
           <PagesView
             pages={pages}
@@ -319,6 +319,7 @@ function App() {
             pages={pages}
             posts={posts}
             fanRecords={fanRecords}
+            groupRecords={groupRecords}
             month={month}
             setMonth={setMonth}
             showToast={showToast}
@@ -326,6 +327,13 @@ function App() {
         )}
         {view === "trend" && (
           <TrendView pages={pages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords} />
+        )}
+        {view === "settings" && (
+          <SettingsView
+            pages={pages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords}
+            savePages={savePages} saveFanRecords={saveFanRecords} savePosts={savePosts}
+            saveGroupRecords={saveGroupRecords} showToast={showToast}
+          />
         )}
       </main>
       {toast && <div style={styles.toast}>{toast}</div>}
@@ -345,12 +353,14 @@ const fontImports = `
   ::-webkit-scrollbar-track { background: transparent; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
-  @media (max-width: 1080px) {
-    .fbm-form-grid { grid-template-columns: repeat(2, 1fr) !important; }
-  }
-  @media (max-width: 720px) {
+  @media (max-width: 767px) {
+    .fbm-main { padding: 66px 18px 60px !important; }
     .fbm-form-grid { grid-template-columns: 1fr !important; }
     .fbm-form-grid > * { grid-column: span 1 !important; }
+    .fbm-view-wrap { gap: 16px !important; }
+  }
+  @media (min-width: 768px) and (max-width: 1080px) {
+    .fbm-form-grid { grid-template-columns: repeat(2, 1fr) !important; }
   }
 `;
 
@@ -361,32 +371,120 @@ function Sidebar({ view, setView, pageCount }) {
     { key: "report", label: "月報表", icon: "chart" },
     { key: "trend", label: "趨勢總覽", icon: "trend" },
     { key: "pages", label: "粉絲團清單", icon: "list" },
+    { key: "settings", label: "設定與備份", icon: "save" },
   ];
+
+  const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
+  // Close sidebar when user navigates (mobile only)
+  const handleNav = (key) => {
+    setView(key);
+    if (isMobile) setOpen(false);
+  };
+
+  const sidebarStyle = isMobile ? {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    height: "100%",
+    zIndex: 200,
+    width: 240,
+    background: "#EBE6D9",
+    borderRight: "1px solid #DDD6C6",
+    display: "flex",
+    flexDirection: "column",
+    padding: "24px 18px",
+    transform: open ? "translateX(0)" : "translateX(-100%)",
+    transition: "transform 0.22s ease",
+    boxShadow: open ? "4px 0 24px rgba(0,0,0,0.18)" : "none",
+  } : {
+    width: 240,
+    flexShrink: 0,
+    background: "#EBE6D9",
+    borderRight: "1px solid #DDD6C6",
+    display: "flex",
+    flexDirection: "column",
+    padding: "24px 18px",
+  };
+
   return (
-    <nav style={styles.sidebar}>
-      <div style={styles.brand}>
-        <div style={styles.brandMark}>粉</div>
-        <div>
-          <div style={styles.brandTitle}>粉絲團監測站</div>
-          <div style={styles.brandSub}>{pageCount} 家追蹤中</div>
+    <>
+      {/* Mobile hamburger button — only visible when sidebar is closed on mobile */}
+      {isMobile && !open && (
+        <button
+          onClick={() => setOpen(true)}
+          style={{
+            position: "fixed", top: 14, left: 14, zIndex: 300,
+            width: 40, height: 40, borderRadius: 10,
+            background: "#8A9A8E", border: "none", cursor: "pointer",
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: 5,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+          }}
+          title="開啟選單"
+        >
+          {[0,1,2].map((i) => (
+            <span key={i} style={{ width: 18, height: 2, background: "#F3F0EA", borderRadius: 2, display: "block" }} />
+          ))}
+        </button>
+      )}
+
+      {/* Overlay behind open sidebar on mobile */}
+      {isMobile && open && (
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 199,
+            background: "rgba(58,58,56,0.38)",
+          }}
+        />
+      )}
+
+      <nav style={sidebarStyle}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26 }}>
+          <div style={{ ...styles.brand, marginBottom: 0 }}>
+            <div style={styles.brandMark}>粉</div>
+            <div>
+              <div style={styles.brandTitle}>粉絲團監測站</div>
+              <div style={styles.brandSub}>{pageCount} 家追蹤中</div>
+            </div>
+          </div>
+          {/* Close button — only on mobile */}
+          {isMobile && (
+            <button
+              onClick={() => setOpen(false)}
+              style={{ ...styles.iconBtn, marginLeft: 8, flexShrink: 0 }}
+              title="關閉選單"
+            >
+              <Icon name="x" size={18} />
+            </button>
+          )}
         </div>
-      </div>
-      <div style={styles.navList}>
-        {items.map((it) => (
-          <button
-            key={it.key}
-            onClick={() => setView(it.key)}
-            style={{ ...styles.navItem, ...(view === it.key ? styles.navItemActive : {}) }}
-          >
-            <Icon name={it.icon} size={17} />
-            <span>{it.label}</span>
-          </button>
-        ))}
-      </div>
-      <div style={styles.sidebarFoot}>
-        資料存於雲端，所有人開啟同一個網址即可共用同一份資料。
-      </div>
-    </nav>
+
+        <div style={styles.navList}>
+          {items.map((it) => (
+            <button
+              key={it.key}
+              onClick={() => handleNav(it.key)}
+              style={{ ...styles.navItem, ...(view === it.key ? styles.navItemActive : {}) }}
+            >
+              <Icon name={it.icon} size={17} />
+              <span>{it.label}</span>
+            </button>
+          ))}
+        </div>
+        <div style={styles.sidebarFoot}>
+          資料存於雲端，所有人開啟同一個網址即可共用同一份資料。
+        </div>
+      </nav>
+    </>
   );
 }
 
@@ -667,12 +765,9 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
   const [editCategory, setEditCategory] = useState("");
   const [editRegion, setEditRegion] = useState("");
   const [showImport, setShowImport] = useState(false);
-  const [pendingRestore, setPendingRestore] = useState(null); // parsed backup object awaiting confirmation
-  const [restoreError, setRestoreError] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState(null); // page id awaiting delete confirmation
   const [groupMonth, setGroupMonth] = useState(nowMonth()); // which month's group assignments to show/edit
   const [filterGroup, setFilterGroup] = useState(""); // "" | "A" | "B" | "C" | "none"
-  const restoreInputRef = useRef(null);
   const inputRef = useRef(null);
 
   const setGroupForPage = (pageId, group) => {
@@ -755,84 +850,17 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
   });
   const currentMonth = nowMonth();
 
-  /* ---------------- Full data backup (export / restore) ---------------- */
-  const exportBackup = () => {
-    const backup = {
-      app: "fbmonitor",
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      pages,
-      fanRecords,
-      posts,
-      groupRecords,
-    };
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `粉絲團監測站_完整備份_${nowMonth()}_${Date.now()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast("已匯出完整備份");
-  };
-
-  const handleRestoreFile = async (file) => {
-    setRestoreError("");
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (!data || typeof data !== "object" || !Array.isArray(data.pages) || typeof data.fanRecords !== "object" || !Array.isArray(data.posts)) {
-        setRestoreError("這個檔案的格式不像是本系統的備份檔，請確認檔案是否正確。");
-        return;
-      }
-      setPendingRestore(data);
-    } catch (e) {
-      setRestoreError("讀取失敗，請確認檔案是有效的 JSON 備份檔。");
-    }
-  };
-
-  const confirmRestore = () => {
-    if (!pendingRestore) return;
-    savePages(pendingRestore.pages || []);
-    saveFanRecords(pendingRestore.fanRecords || {});
-    savePosts(pendingRestore.posts || []);
-    saveGroupRecords(pendingRestore.groupRecords || {});
-    showToast("已從備份還原所有資料");
-    setPendingRestore(null);
-  };
-
   return (
     <div style={styles.viewWrap}>
       <Header
         title="粉絲團清單"
         subtitle={`目前追蹤 ${pages.length} 家粉絲團，可隨時新增或移除`}
       >
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button style={styles.secondaryBtn} onClick={() => setShowImport(true)}>
-            <Icon name="download" size={16} />
-            匯入 Excel
-          </button>
-          <button style={styles.secondaryBtn} onClick={exportBackup}>
-            <Icon name="save" size={16} />
-            匯出完整備份
-          </button>
-          <button style={styles.secondaryBtn} onClick={() => restoreInputRef.current?.click()}>
-            <Icon name="trend" size={16} />
-            從備份還原
-          </button>
-          <input
-            ref={restoreInputRef}
-            type="file"
-            accept=".json"
-            style={{ display: "none" }}
-            onChange={(e) => e.target.files?.[0] && handleRestoreFile(e.target.files[0])}
-          />
-        </div>
+        <button style={styles.secondaryBtn} onClick={() => setShowImport(true)}>
+          <Icon name="download" size={16} />
+          匯入 Excel
+        </button>
       </Header>
-
-      {restoreError && <div style={styles.errorBox}>{restoreError}</div>}
 
       {pendingDeleteId && (
         <ConfirmDialog
@@ -841,35 +869,6 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
           onConfirm={confirmDeletePage}
           onCancel={() => setPendingDeleteId(null)}
         />
-      )}
-
-      {pendingRestore && (
-        <div style={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && setPendingRestore(null)}>
-          <div style={{ ...styles.modalCard, maxWidth: 520 }}>
-            <div style={styles.modalHeader}>
-              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                <Icon name="trend" size={17} />
-                <span style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 17 }}>確認還原備份</span>
-              </div>
-              <button style={styles.iconBtn} onClick={() => setPendingRestore(null)}><Icon name="x" size={18} /></button>
-            </div>
-            <div style={styles.modalBody}>
-              <p style={{ fontSize: 13.5, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
-                這份備份包含 <b>{(pendingRestore.pages || []).length}</b> 家粉絲團、
-                <b>{(pendingRestore.posts || []).length}</b> 筆貼文紀錄。
-              </p>
-              <div style={styles.warnBox}>
-                ⚠ 還原會「整批覆蓋」目前畫面上的所有資料（粉絲團清單、粉絲數紀錄、貼文紀錄），現有資料將會被取代，無法復原。請確認這是你要的備份檔案。
-              </div>
-            </div>
-            <div style={styles.modalFooter}>
-              <button style={styles.secondaryBtn} onClick={() => setPendingRestore(null)}>取消</button>
-              <button style={{ ...styles.primaryBtn, background: "#C08081" }} onClick={confirmRestore}>
-                確認覆蓋並還原
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {showImport && (
@@ -1246,6 +1245,10 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
     () => entriesInMonth(fanRecords, fanPageId, month),
     [fanRecords, fanPageId, month]
   );
+  const totalFanEntriesThisMonth = useMemo(
+    () => pages.reduce((sum, p) => sum + entriesInMonth(fanRecords, p.id, month).length, 0),
+    [fanRecords, pages, month]
+  );
 
   const addFanEntry = () => {
     if (!fanPageId) {
@@ -1287,12 +1290,16 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
         />
       )}
 
-      <div style={styles.tabRow}>
-        <button style={{ ...styles.tabBtn, ...(tab === "posts" ? styles.tabBtnActive : {}) }} onClick={() => setTab("posts")}>
+      <div style={styles.segControl}>
+        <button style={{ ...styles.segBtn, ...(tab === "posts" ? styles.segBtnActive : {}) }} onClick={() => setTab("posts")}>
+          <Icon name="spark" size={16} />
           貼文互動數
+          <span style={{ ...styles.segBadge, ...(tab === "posts" ? styles.segBadgeActive : {}) }}>{monthPosts.length}</span>
         </button>
-        <button style={{ ...styles.tabBtn, ...(tab === "fans" ? styles.tabBtnActive : {}) }} onClick={() => setTab("fans")}>
+        <button style={{ ...styles.segBtn, ...(tab === "fans" ? styles.segBtnActive : {}) }} onClick={() => setTab("fans")}>
+          <Icon name="users" size={16} />
           粉絲人數
+          <span style={{ ...styles.segBadge, ...(tab === "fans" ? styles.segBadgeActive : {}) }}>{totalFanEntriesThisMonth}</span>
         </button>
       </div>
 
@@ -1586,13 +1593,33 @@ function TypeTag({ type }) {
 }
 
 /* ============================================================ Report view ============================================================ */
-function ReportView({ pages, posts, fanRecords, month, setMonth, showToast }) {
+function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, showToast }) {
   const monthPosts = useMemo(() => posts.filter((p) => p.month === month), [posts, month]);
   const pageMap = useMemo(() => {
     const m = {};
     pages.forEach((p) => (m[p.id] = p));
     return m;
   }, [pages]);
+
+  // Group assignment for the current month
+  const monthGroups = useMemo(() => groupRecords[month] || {}, [groupRecords, month]);
+  const getGroup = (pageId) => monthGroups[pageId] || "";
+
+  // Pages filtered by group
+  const pagesByGroup = useMemo(() => {
+    const groups = { A: [], B: [], C: [], "": [] };
+    pages.forEach((p) => {
+      const g = monthGroups[p.id] || "";
+      if (groups[g]) groups[g].push(p);
+    });
+    return groups;
+  }, [pages, monthGroups]);
+
+  const groupCounts = { A: pagesByGroup.A.length, B: pagesByGroup.B.length, C: pagesByGroup.C.length };
+  const hasGroupData = Object.values(monthGroups).some((g) => g);
+
+  // Active group tab: "" = all, "A"/"B"/"C"
+  const [activeGroup, setActiveGroup] = useState("");
 
   const topLiked = useMemo(
     () => [...monthPosts].sort((a, b) => b.likes - a.likes).slice(0, 10),
@@ -1613,11 +1640,30 @@ function ReportView({ pages, posts, fanRecords, month, setMonth, showToast }) {
         const prev = prevEntry?.count;
         const diff = typeof cur === "number" && typeof prev === "number" ? cur - prev : null;
         const pct = diff != null && prev > 0 ? (diff / prev) * 100 : null;
-        return { page: p, cur, curDate: curEntry?.date, prev, diff, pct };
+        return { page: p, cur, curDate: curEntry?.date, prev, diff, pct, group: getGroup(p.id) };
       })
       .filter((r) => r.cur != null)
       .sort((a, b) => (b.diff ?? -Infinity) - (a.diff ?? -Infinity));
-  }, [pages, fanRecords, month]);
+  }, [pages, fanRecords, month, monthGroups]);
+
+  // Fan growth filtered by active group
+  const fanGrowthFiltered = useMemo(() =>
+    activeGroup ? fanGrowth.filter((r) => r.group === activeGroup) : fanGrowth,
+    [fanGrowth, activeGroup]
+  );
+
+  // Posts filtered by active group
+  const monthPostsFiltered = useMemo(() => {
+    if (!activeGroup) return monthPosts;
+    const groupPageIds = new Set(pagesByGroup[activeGroup]?.map((p) => p.id) || []);
+    return monthPosts.filter((p) => groupPageIds.has(p.pageId));
+  }, [monthPosts, activeGroup, pagesByGroup]);
+
+  // All posts for this group sorted by engagement (no limit)
+  const postsEngagedFiltered = useMemo(
+    () => [...monthPostsFiltered].sort((a, b) => engagement(b) - engagement(a)),
+    [monthPostsFiltered]
+  );
 
   const totals = useMemo(() => {
     const totalFans = fanGrowth.reduce((s, r) => s + (r.cur || 0), 0);
@@ -1709,8 +1755,10 @@ function ReportView({ pages, posts, fanRecords, month, setMonth, showToast }) {
     try {
       const wb = XLSX.utils.book_new();
 
-      const growthSheet = fanGrowth.map((r) => ({
+      // Helper: fan growth row
+      const toGrowthRow = (r) => ({
         粉絲團: r.page.name,
+        競賽組別: r.group || "未參加",
         粉絲團網址: r.page.url || "",
         法人集團: r.page.category || "",
         地區: r.page.region || "",
@@ -1719,12 +1767,13 @@ function ReportView({ pages, posts, fanRecords, month, setMonth, showToast }) {
         上月粉絲數: r.prev ?? "",
         增減人數: r.diff ?? "",
         增減百分比: r.pct != null ? `${r.pct.toFixed(2)}%` : "",
-      }));
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(growthSheet), "粉絲成長排名");
+      });
 
-      const toRow = (p, i) => ({
+      // Helper: post row
+      const toPostRow = (p, i) => ({
         排名: i + 1,
         粉絲團: pageMap[p.pageId]?.name || "",
+        競賽組別: getGroup(p.pageId) || "未參加",
         粉絲團網址: pageMap[p.pageId]?.url || "",
         法人集團: pageMap[p.pageId]?.category || "",
         地區: pageMap[p.pageId]?.region || "",
@@ -1738,9 +1787,33 @@ function ReportView({ pages, posts, fanRecords, month, setMonth, showToast }) {
         貼文連結: p.url,
       });
 
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topLiked.map(toRow)), "最高讚貼文");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(topEngaged.map(toRow)), "最高互動貼文");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthPosts.map((p, i) => toRow(p, i))), "全部貼文紀錄");
+      // Sheet 1: 全體粉絲成長排名（含組別欄）
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(fanGrowth.map(toGrowthRow)), "粉絲成長排名_全體");
+
+      // Sheets 2-4: A/B/C 分組粉絲成長
+      ["A", "B", "C"].forEach((g) => {
+        const rows = fanGrowth.filter((r) => r.group === g).map(toGrowthRow);
+        if (rows.length > 0)
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), `粉絲成長排名_${g}組`);
+      });
+
+      // Sheet 5: 全體貼文互動排名（含組別欄，全部排序不限10）
+      const allPostsEngaged = [...monthPosts].sort((a, b) => engagement(b) - engagement(a));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(allPostsEngaged.map(toPostRow)), "互動排名_全體");
+
+      // Sheets 6-8: A/B/C 分組貼文互動排名（全部）
+      ["A", "B", "C"].forEach((g) => {
+        const groupPageIds = new Set(pagesByGroup[g]?.map((p) => p.id) || []);
+        const rows = [...monthPosts]
+          .filter((p) => groupPageIds.has(p.pageId))
+          .sort((a, b) => engagement(b) - engagement(a))
+          .map(toPostRow);
+        if (rows.length > 0)
+          XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), `互動排名_${g}組`);
+      });
+
+      // Sheet 9: 全部貼文紀錄
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(monthPosts.map((p, i) => toPostRow(p, i))), "全部貼文紀錄");
 
       XLSX.writeFile(wb, `粉絲團月報表_${month}.xlsx`);
       showToast("已匯出 Excel");
@@ -1748,7 +1821,7 @@ function ReportView({ pages, posts, fanRecords, month, setMonth, showToast }) {
       console.error(e);
       showToast("匯出失敗，請稍後再試");
     }
-  }, [fanGrowth, topLiked, topEngaged, monthPosts, pageMap, month, showToast]);
+  }, [fanGrowth, monthPosts, pageMap, pagesByGroup, month, showToast, monthGroups]);
 
   return (
     <div style={styles.viewWrap}>
@@ -1773,16 +1846,48 @@ function ReportView({ pages, posts, fanRecords, month, setMonth, showToast }) {
         <StatCard icon="spark" label="本月貼文紀錄數" value={totals.postCount.toLocaleString()} />
       </div>
 
-      <SectionTitle icon="users" title="粉絲人數成長排名" />
-      <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
-        {fanGrowth.length === 0 ? (
-          <EmptyState text="本月還沒有粉絲人數紀錄，請到「本月輸入」填入。" />
+      <SectionTitle icon="users" title="粉絲人數成長排名 · 貼文互動排名" />
+
+      {/* Group tab selector */}
+      <div style={styles.segControl}>
+        <button style={{ ...styles.segBtn, ...(activeGroup === "" ? styles.segBtnActive : {}) }} onClick={() => setActiveGroup("")}>
+          全體
+          <span style={{ ...styles.segBadge, ...(activeGroup === "" ? styles.segBadgeActive : {}) }}>{fanGrowth.length}</span>
+        </button>
+        {["A", "B", "C"].map((g) => {
+          const colors = { A: { bg: "#DDE5E2", text: "#3D6A63", activeBg: "#3D6A63" }, B: { bg: "#EDE4D6", text: "#8A5E3C", activeBg: "#8A5E3C" }, C: { bg: "#E2DDE8", text: "#5E4A7A", activeBg: "#5E4A7A" } };
+          const c = colors[g];
+          const isActive = activeGroup === g;
+          return (
+            <button
+              key={g}
+              style={{ ...styles.segBtn, ...(isActive ? styles.segBtnActive : {}), opacity: groupCounts[g] === 0 ? 0.4 : 1 }}
+              onClick={() => groupCounts[g] > 0 && setActiveGroup(g)}
+              disabled={groupCounts[g] === 0}
+            >
+              <span style={{ width: 18, height: 18, borderRadius: 5, background: isActive ? c.activeBg : c.bg, color: isActive ? "#fff" : c.text, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{g}</span>
+              {g} 組
+              <span style={{ ...styles.segBadge, ...(isActive ? { background: c.activeBg, color: "#fff" } : {}) }}>{groupCounts[g]}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {!hasGroupData && (
+        <div style={styles.warnBox}>尚未設定 {monthLabel(month)} 的競賽分組——請到「粉絲團清單」→「競賽分組設定」，選好月份後在每家旁邊設定 A/B/C 組，分頁切換才會生效。</div>
+      )}
+
+      {/* Fan growth table */}
+      <div style={{ ...styles.card, padding: 0, overflow: "hidden", marginTop: 0 }}>
+        {fanGrowthFiltered.length === 0 ? (
+          <div style={{ padding: 20 }}><EmptyState text="這個組別本月還沒有粉絲人數紀錄。" /></div>
         ) : (
           <table style={styles.table}>
             <thead>
               <tr>
                 <th style={styles.th}>排名</th>
                 <th style={styles.th}>粉絲團</th>
+                {activeGroup === "" && hasGroupData && <th style={{ ...styles.th, textAlign: "center", width: 72 }}>組別</th>}
                 <th style={{ ...styles.th, textAlign: "right" }}>本月人數</th>
                 <th style={{ ...styles.th, textAlign: "right" }}>量測日期</th>
                 <th style={{ ...styles.th, textAlign: "right" }}>增減</th>
@@ -1790,95 +1895,118 @@ function ReportView({ pages, posts, fanRecords, month, setMonth, showToast }) {
               </tr>
             </thead>
             <tbody>
-              {fanGrowth.map((r, i) => (
-                <tr key={r.page.id} style={styles.tr}>
-                  <td style={styles.td}>{i === 0 ? <Icon name="crown" size={15} className="" /> : i + 1}</td>
-                  <td style={styles.td}>
-                    <PageNameCell page={r.page} />
-                  </td>
-                  <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{r.cur?.toLocaleString()}</td>
-                  <td style={{ ...styles.td, textAlign: "right", color: "#A6A096", fontSize: 12.5 }}>{r.curDate}</td>
-                  <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.diff == null ? "#A6A096" : r.diff >= 0 ? "#7B8F77" : "#C08081" }}>
-                    {r.diff == null ? "—" : (r.diff >= 0 ? "+" : "") + r.diff.toLocaleString()}
-                  </td>
-                  <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.pct == null ? "#A6A096" : r.pct >= 0 ? "#7B8F77" : "#C08081" }}>
-                    {r.pct == null ? "—" : `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%`}
-                  </td>
-                </tr>
-              ))}
+              {fanGrowthFiltered.map((r, i) => {
+                const groupColors = { A: "#3D6A63", B: "#8A5E3C", C: "#5E4A7A" };
+                const groupBgs = { A: "#DDE5E2", B: "#EDE4D6", C: "#E2DDE8" };
+                return (
+                  <tr key={r.page.id} style={styles.tr}>
+                    <td style={styles.td}>{i === 0 ? <Icon name="crown" size={15} /> : i + 1}</td>
+                    <td style={styles.td}><PageNameCell page={r.page} /></td>
+                    {activeGroup === "" && hasGroupData && (
+                      <td style={{ ...styles.td, textAlign: "center" }}>
+                        {r.group ? (
+                          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 6, background: groupBgs[r.group], color: groupColors[r.group], fontSize: 11, fontWeight: 700 }}>{r.group}</span>
+                        ) : <span style={{ color: "#D0CAC0" }}>—</span>}
+                      </td>
+                    )}
+                    <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{r.cur?.toLocaleString()}</td>
+                    <td style={{ ...styles.td, textAlign: "right", color: "#A6A096", fontSize: 12.5 }}>{r.curDate}</td>
+                    <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.diff == null ? "#A6A096" : r.diff >= 0 ? "#7B8F77" : "#C08081" }}>
+                      {r.diff == null ? "—" : (r.diff >= 0 ? "+" : "") + r.diff.toLocaleString()}
+                    </td>
+                    <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.pct == null ? "#A6A096" : r.pct >= 0 ? "#7B8F77" : "#C08081" }}>
+                      {r.pct == null ? "—" : `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%`}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
 
-      <SectionTitle icon="heart" title="本月最高讚貼文 TOP 10" />
-      <PostRankTable posts={topLiked} pageMap={pageMap} metric="likes" metricLabel="讚數" />
-
-      <SectionTitle icon="spark" title="本月最高互動貼文 TOP 10" />
-      <PostRankTable posts={topEngaged} pageMap={pageMap} metric={engagement} metricLabel="互動總計" />
-
-      <SectionTitle icon="edit" title="AI 貼文表現分析提示詞" />
-      <div style={styles.card}>
-        <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
-          選擇要分析的經銷商（不選則代表全部），點「產生提示詞」後會整理成一段文字，複製貼到 Claude 或其他 AI 工具即可取得分析。這個應用程式本身不會自動產生分析結果，需要你手動貼到 AI 工具中。
-        </p>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
-          <div style={{ fontSize: 12.5, color: "#9C9684" }}>
-            已選 {promptPageIds.length} / {pages.length} 家（不選＝全部）
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button style={styles.secondaryBtn} onClick={() => setPromptPageIds(promptFilteredPages.map((p) => p.id))}>全選</button>
-            <button style={styles.secondaryBtn} onClick={() => setPromptPageIds([])}>全取消</button>
-          </div>
+      {/* Post engagement ranking — all posts for this group, sorted by engagement */}
+      <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "12px 18px", borderBottom: "1px solid #E6E1D6", fontSize: 13, color: "#7A7568", fontWeight: 500 }}>
+          {activeGroup ? `${activeGroup} 組貼文互動排名（全部 ${postsEngagedFiltered.length} 篇，讚+留言+分享）` : `全體貼文互動排名（全部 ${postsEngagedFiltered.length} 篇）`}
         </div>
-        <input
-          style={{ ...styles.input, marginBottom: 10 }}
-          placeholder="搜尋粉絲團名稱、法人或地區，篩選下方清單…"
-          value={promptQuery}
-          onChange={(e) => setPromptQuery(e.target.value)}
-        />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxHeight: 180, overflowY: "auto", marginBottom: 16 }}>
-          {promptFilteredPages.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: "#A6A096" }}>沒有符合搜尋條件的粉絲團</div>
-          ) : (
-            promptFilteredPages.map((p) => {
-              const active = promptPageIds.includes(p.id);
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => togglePromptPage(p.id)}
-                  style={{ ...styles.chipBtn, ...(active ? styles.chipBtnActive : {}) }}
-                >
-                  {p.name}
-                </button>
-              );
-            })
-          )}
-        </div>
-
-        <button style={styles.primaryBtn} onClick={buildPrompt}>
-          <Icon name="spark" size={16} />
-          產生提示詞
-        </button>
-
-        {generatedPrompt && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 12.5, color: "#9C9684" }}>已產生，可直接複製貼到 AI 工具</div>
-              <button style={styles.secondaryBtn} onClick={copyPrompt}>
-                <Icon name={copied ? "save" : "link"} size={15} />
-                {copied ? "已複製" : "複製全部"}
-              </button>
-            </div>
-            <textarea
-              readOnly
-              value={generatedPrompt}
-              style={styles.promptTextarea}
-              onClick={(e) => e.target.select()}
-            />
-          </div>
+        {postsEngagedFiltered.length === 0 ? (
+          <div style={{ padding: 20 }}><EmptyState text="這個組別本月還沒有貼文紀錄。" /></div>
+        ) : (
+          <PostRankTable posts={postsEngagedFiltered} pageMap={pageMap} metric={engagement} metricLabel="互動總計" showGroup={activeGroup === "" && hasGroupData} getGroup={getGroup} collapsible />
         )}
       </div>
+
+      {/* 最高讚 TOP10 + AI 提示詞 — 只在「全體」分頁顯示 */}
+      {activeGroup === "" && (
+        <>
+          <SectionTitle icon="heart" title="本月最高讚貼文 TOP 10" />
+          <PostRankTable posts={topLiked} pageMap={pageMap} metric="likes" metricLabel="讚數" showGroup={hasGroupData} getGroup={getGroup} />
+
+          <SectionTitle icon="edit" title="AI 貼文表現分析提示詞" />
+          <div style={styles.card}>
+            <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
+              選擇要分析的經銷商（不選則代表全部），點「產生提示詞」後會整理成一段文字，複製貼到 Claude 或其他 AI 工具即可取得分析。這個應用程式本身不會自動產生分析結果，需要你手動貼到 AI 工具中。
+            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 12.5, color: "#9C9684" }}>
+                已選 {promptPageIds.length} / {pages.length} 家（不選＝全部）
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={styles.secondaryBtn} onClick={() => setPromptPageIds(promptFilteredPages.map((p) => p.id))}>全選</button>
+                <button style={styles.secondaryBtn} onClick={() => setPromptPageIds([])}>全取消</button>
+              </div>
+            </div>
+            <input
+              style={{ ...styles.input, marginBottom: 10 }}
+              placeholder="搜尋粉絲團名稱、法人或地區，篩選下方清單…"
+              value={promptQuery}
+              onChange={(e) => setPromptQuery(e.target.value)}
+            />
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxHeight: 180, overflowY: "auto", marginBottom: 16 }}>
+              {promptFilteredPages.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: "#A6A096" }}>沒有符合搜尋條件的粉絲團</div>
+              ) : (
+                promptFilteredPages.map((p) => {
+                  const active = promptPageIds.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => togglePromptPage(p.id)}
+                      style={{ ...styles.chipBtn, ...(active ? styles.chipBtnActive : {}) }}
+                    >
+                      {p.name}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <button style={styles.primaryBtn} onClick={buildPrompt}>
+              <Icon name="spark" size={16} />
+              產生提示詞
+            </button>
+
+            {generatedPrompt && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ fontSize: 12.5, color: "#9C9684" }}>已產生，可直接複製貼到 AI 工具</div>
+                  <button style={styles.secondaryBtn} onClick={copyPrompt}>
+                    <Icon name={copied ? "save" : "link"} size={15} />
+                    {copied ? "已複製" : "複製全部"}
+                  </button>
+                </div>
+                <textarea
+                  readOnly
+                  value={generatedPrompt}
+                  style={styles.promptTextarea}
+                  onClick={(e) => e.target.select()}
+                />
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1894,7 +2022,11 @@ function PageNameCell({ page }) {
   );
 }
 
-function PostRankTable({ posts, pageMap, metric, metricLabel }) {
+function PostRankTable({ posts, pageMap, metric, metricLabel, showGroup, getGroup, collapsible }) {
+  const [expanded, setExpanded] = useState(false);
+  const groupColors = { A: "#3D6A63", B: "#8A5E3C", C: "#5E4A7A" };
+  const groupBgs = { A: "#DDE5E2", B: "#EDE4D6", C: "#E2DDE8" };
+
   if (posts.length === 0) {
     return (
       <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
@@ -1902,6 +2034,10 @@ function PostRankTable({ posts, pageMap, metric, metricLabel }) {
       </div>
     );
   }
+
+  const COLLAPSE_THRESHOLD = 10;
+  const canCollapse = collapsible && posts.length > COLLAPSE_THRESHOLD;
+  const visiblePosts = canCollapse && !expanded ? posts.slice(0, COLLAPSE_THRESHOLD) : posts;
   return (
     <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
       <table style={styles.table}>
@@ -1909,6 +2045,7 @@ function PostRankTable({ posts, pageMap, metric, metricLabel }) {
           <tr>
             <th style={styles.th}>排名</th>
             <th style={styles.th}>粉絲團</th>
+            {showGroup && <th style={{ ...styles.th, textAlign: "center", width: 72 }}>組別</th>}
             <th style={styles.th}>日期</th>
             <th style={styles.th}>類型</th>
             <th style={styles.th}>連結</th>
@@ -1920,36 +2057,61 @@ function PostRankTable({ posts, pageMap, metric, metricLabel }) {
           </tr>
         </thead>
         <tbody>
-          {posts.map((p, i) => (
-            <tr key={p.id} style={styles.tr}>
-              <td style={styles.td}>{i === 0 ? <Icon name="crown" size={15} /> : i + 1}</td>
-              <td style={styles.td}>
-                <PageNameCell page={pageMap[p.pageId]} />
-              </td>
-              <td style={styles.td}>{p.date}</td>
-              <td style={styles.td}><TypeTag type={p.type} /></td>
-              <td style={styles.td}>
-                {p.url ? (
-                  <a href={p.url} target="_blank" rel="noreferrer" style={styles.link}>
-                    <Icon name="link" size={13} /> 查看
-                  </a>
-                ) : (
-                  <span style={{ color: "#A6A096" }}>—</span>
+          {visiblePosts.map((p, i) => {
+            const g = getGroup ? getGroup(p.pageId) : "";
+            return (
+              <tr key={p.id} style={styles.tr}>
+                <td style={styles.td}>{i === 0 ? <Icon name="crown" size={15} /> : i + 1}</td>
+                <td style={styles.td}>
+                  <PageNameCell page={pageMap[p.pageId]} />
+                </td>
+                {showGroup && (
+                  <td style={{ ...styles.td, textAlign: "center" }}>
+                    {g ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 6, background: groupBgs[g], color: groupColors[g], fontSize: 11, fontWeight: 700 }}>{g}</span>
+                    ) : <span style={{ color: "#D0CAC0" }}>—</span>}
+                  </td>
                 )}
-              </td>
-              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.likes}</td>
-              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.comments}</td>
-              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.shares}</td>
-              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.views ? "#A18A4C" : "#A6A096", fontWeight: p.views ? 600 : 400 }}>
-                {p.views ? p.views.toLocaleString() : "—"}
-              </td>
-              <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>
-                {typeof metric === "function" ? metric(p) : p[metric]}
-              </td>
-            </tr>
-          ))}
+                <td style={styles.td}>{p.date}</td>
+                <td style={styles.td}><TypeTag type={p.type} /></td>
+                <td style={styles.td}>
+                  {p.url ? (
+                    <a href={p.url} target="_blank" rel="noreferrer" style={styles.link}>
+                      <Icon name="link" size={13} /> 查看
+                    </a>
+                  ) : (
+                    <span style={{ color: "#A6A096" }}>—</span>
+                  )}
+                </td>
+                <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.likes}</td>
+                <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.comments}</td>
+                <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.shares}</td>
+                <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.views ? "#A18A4C" : "#A6A096", fontWeight: p.views ? 600 : 400 }}>
+                  {p.views ? p.views.toLocaleString() : "—"}
+                </td>
+                <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>
+                  {typeof metric === "function" ? metric(p) : p[metric]}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      {canCollapse && (
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          style={{
+            width: "100%", padding: "11px", border: "none", background: "#F3F0EA",
+            borderTop: "1px solid #E6E1D6", cursor: "pointer", fontSize: 13,
+            color: "#7A7568", fontFamily: "'Noto Sans TC', sans-serif",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+          }}
+        >
+          {expanded
+            ? `▲ 收合（只顯示前 ${COLLAPSE_THRESHOLD} 筆）`
+            : `▼ 展開全部（還有 ${posts.length - COLLAPSE_THRESHOLD} 筆，共 ${posts.length} 篇）`}
+        </button>
+      )}
     </div>
   );
 }
@@ -2791,6 +2953,126 @@ function MonthSwitcher({ month, setMonth }) {
   );
 }
 
+/* ============================================================ Settings & Backup ============================================================ */
+function SettingsView({ pages, fanRecords, posts, groupRecords, savePages, saveFanRecords, savePosts, saveGroupRecords, showToast }) {
+  const [pendingRestore, setPendingRestore] = useState(null);
+  const [restoreError, setRestoreError] = useState("");
+  const restoreInputRef = useRef(null);
+
+  const exportBackup = () => {
+    const blob = new Blob([JSON.stringify({
+      app: "fbmonitor", version: 1, exportedAt: new Date().toISOString(),
+      pages, fanRecords, posts, groupRecords,
+    }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `粉絲團監測站_完整備份_${nowMonth()}_${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("已匯出完整備份");
+  };
+
+  const handleRestoreFile = async (file) => {
+    setRestoreError("");
+    try {
+      const data = JSON.parse(await file.text());
+      if (!data || !Array.isArray(data.pages) || typeof data.fanRecords !== "object" || !Array.isArray(data.posts)) {
+        setRestoreError("這個檔案的格式不像是本系統的備份檔，請確認檔案是否正確。");
+        return;
+      }
+      setPendingRestore(data);
+    } catch (e) {
+      setRestoreError("讀取失敗，請確認檔案是有效的 JSON 備份檔。");
+    }
+  };
+
+  const confirmRestore = () => {
+    if (!pendingRestore) return;
+    savePages(pendingRestore.pages || []);
+    saveFanRecords(pendingRestore.fanRecords || {});
+    savePosts(pendingRestore.posts || []);
+    saveGroupRecords(pendingRestore.groupRecords || {});
+    showToast("已從備份還原所有資料");
+    setPendingRestore(null);
+  };
+
+  const stats = useMemo(() => ({
+    pages: pages.length,
+    posts: posts.length,
+    fanEntries: Object.values(fanRecords).reduce((s, arr) => s + (arr || []).length, 0),
+    groupMonths: Object.keys(groupRecords).filter((m) => Object.values(groupRecords[m] || {}).some((g) => g)).length,
+  }), [pages, posts, fanRecords, groupRecords]);
+
+  return (
+    <div style={styles.viewWrap}>
+      <Header title="設定與備份" subtitle="管理整個系統的資料備份與還原" />
+
+      {pendingRestore && (
+        <ConfirmDialog
+          title="確認還原備份"
+          message={`這份備份包含 ${(pendingRestore.pages || []).length} 家粉絲團、${(pendingRestore.posts || []).length} 筆貼文紀錄。還原會整批覆蓋目前所有資料，無法復原，請確認。`}
+          confirmLabel="確認覆蓋並還原"
+          onConfirm={confirmRestore}
+          onCancel={() => setPendingRestore(null)}
+        />
+      )}
+
+      <SectionTitle icon="chart" title="目前資料量" />
+      <div style={styles.statRow}>
+        <StatCard icon="list" label="追蹤粉絲團" value={stats.pages.toLocaleString()} />
+        <StatCard icon="spark" label="貼文紀錄筆數" value={stats.posts.toLocaleString()} />
+        <StatCard icon="users" label="粉絲數量測紀錄" value={stats.fanEntries.toLocaleString()} />
+        <StatCard icon="trend" label="已設定分組月份" value={`${stats.groupMonths} 個月`} />
+      </div>
+
+      <SectionTitle icon="save" title="完整資料備份" />
+      <div style={styles.card}>
+        <p style={{ fontSize: 13.5, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
+          「匯出完整備份」會把所有粉絲團清單、貼文紀錄、粉絲數量測、競賽分組設定打包成一個 JSON 檔案下載。這份備份可以在任何裝置上用「從備份還原」功能完整還原，也適合在 Firebase 出現問題時作為緊急備援。
+        </p>
+        <p style={{ fontSize: 13, color: "#A6A096", lineHeight: 1.6, marginBottom: 20 }}>
+          建議每個月月底輸入完資料後匯出一次，存到 Google Drive 或其他地方保存。
+        </p>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button style={styles.primaryBtn} onClick={exportBackup}>
+            <Icon name="download" size={16} />
+            匯出完整備份（JSON）
+          </button>
+          <button style={styles.secondaryBtn} onClick={() => restoreInputRef.current?.click()}>
+            <Icon name="trend" size={16} />
+            從備份還原
+          </button>
+          <input ref={restoreInputRef} type="file" accept=".json" style={{ display: "none" }}
+            onChange={(e) => e.target.files?.[0] && handleRestoreFile(e.target.files[0])} />
+        </div>
+        {restoreError && <div style={{ ...styles.errorBox, marginTop: 14 }}>{restoreError}</div>}
+      </div>
+
+      <SectionTitle icon="link" title="系統資訊" />
+      <div style={styles.card}>
+        <table style={{ ...styles.table, fontSize: 13.5 }}>
+          <tbody>
+            {[
+              ["資料儲存位置", "Firebase Firestore（雲端）"],
+              ["同步方式", "所有人開啟同一個網址即可共用同一份資料"],
+              ["瀏覽器相容性", "建議使用 Chrome、Edge、Safari 最新版"],
+              ["手機使用", "支援，點選左上角漢堡按鈕開啟選單"],
+            ].map(([label, value]) => (
+              <tr key={label} style={styles.tr}>
+                <td style={{ ...styles.td, color: "#9C9684", width: 160 }}>{label}</td>
+                <td style={styles.td}>{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ text }) {
   return <div style={styles.emptyState}>{text}</div>;
 }
@@ -2954,13 +3236,20 @@ const styles = {
   emptyState: { padding: "40px 20px", textAlign: "center", color: "#A39D8A", fontSize: 13.5 },
   hint: { fontSize: 12, color: "#A39D8A", marginTop: 10 },
 
-  tabRow: { display: "flex", gap: 6, borderBottom: "1px solid #DDD6C6", paddingBottom: 0 },
-  tabBtn: {
-    padding: "9px 4px", marginRight: 18, border: "none", background: "transparent",
-    color: "#9C9684", fontSize: 14, cursor: "pointer", borderBottom: "2px solid transparent",
-    fontFamily: "'Noto Sans TC', sans-serif",
+  segControl: { background: "#EBE6D9", borderRadius: 12, padding: 5, display: "flex", gap: 4 },
+  segBtn: {
+    flex: 1, padding: "11px 16px", border: "none", borderRadius: 9, background: "transparent",
+    cursor: "pointer", fontFamily: "'Noto Sans TC', sans-serif", fontSize: 14, fontWeight: 500,
+    color: "#7A7568", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+    transition: "all 0.14s",
   },
-  tabBtnActive: { color: "#3A3A38", fontWeight: 600, borderBottom: "2px solid #8A9A8E" },
+  segBtnActive: { background: "#fff", color: "#3A3A38", fontWeight: 600, boxShadow: "0 1px 4px rgba(0,0,0,0.10)" },
+  segBadge: {
+    background: "#DDD6C6", color: "#7A7568", fontSize: 11, fontWeight: 600,
+    padding: "2px 7px", borderRadius: 999, fontFamily: "'Space Grotesk', sans-serif",
+    lineHeight: 1.4, marginLeft: 2,
+  },
+  segBadgeActive: { background: "#8A9A8E", color: "#fff" },
 
   statRow: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 },
   statCard: {
