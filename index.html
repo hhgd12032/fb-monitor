@@ -1914,24 +1914,51 @@ function PostRankTable({ posts, pageMap, metric, metricLabel }) {
 /* ---------------- Reusable line chart with PNG export ---------------- */
 const CHART_PALETTE = ["#8A9A8E", "#B08968", "#5C6B73", "#C08081", "#A18A68", "#7B8F77", "#9A8AA6", "#6E8A9A"];
 
-function downloadSvgAsPng(svgEl, filename) {
+function downloadSvgAsPng(svgEl, filename, title) {
   const serializer = new XMLSerializer();
   const svgString = serializer.serializeToString(svgEl);
   const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(svgBlob);
   const img = new Image();
-  const bbox = svgEl.getBoundingClientRect();
   const scale = 2; // export at 2x for sharper image
+
+  const svgW = svgEl.width?.baseVal?.value || svgEl.getBoundingClientRect().width;
+  const svgH = svgEl.height?.baseVal?.value || svgEl.getBoundingClientRect().height;
+
+  // Reserve space at the top for the title if provided
+  const titleH = title ? 44 : 0;
+  const titleFontSize = 14;
+
   img.onload = () => {
     const canvas = document.createElement("canvas");
-    canvas.width = (svgEl.width?.baseVal?.value || bbox.width) * scale;
-    canvas.height = (svgEl.height?.baseVal?.value || bbox.height) * scale;
+    canvas.width = svgW * scale;
+    canvas.height = (svgH + titleH) * scale;
     const ctx = canvas.getContext("2d");
+
+    // Background
     ctx.fillStyle = "#FBF9F4";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     ctx.scale(scale, scale);
-    ctx.drawImage(img, 0, 0);
+
+    // Draw title
+    if (title) {
+      ctx.fillStyle = "#3A3A38";
+      ctx.font = `600 ${titleFontSize}px 'Noto Sans TC', 'PingFang TC', sans-serif`;
+      ctx.fillText(title, 18, 28);
+      // Thin separator line
+      ctx.strokeStyle = "#E6E1D6";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, titleH - 6);
+      ctx.lineTo(svgW, titleH - 6);
+      ctx.stroke();
+    }
+
+    // Draw chart SVG below title
+    ctx.drawImage(img, 0, titleH);
     URL.revokeObjectURL(url);
+
     canvas.toBlob((blob) => {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
@@ -1974,7 +2001,7 @@ function LineChartCard({ title, months, series, onDownloadName, unit }) {
         <div style={{ fontSize: 13, color: "#7A7568", fontWeight: 500 }}>{title}{unit ? `（單位：${unit}）` : ""}</div>
         <button
           style={styles.secondaryBtn}
-          onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, onDownloadName)}
+          onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, onDownloadName, `${title}${unit ? `（單位：${unit}）` : ""}`)}
           disabled={series.length === 0}
         >
           <Icon name="download" size={15} />
@@ -2051,16 +2078,18 @@ const POST_METRICS = [
 ];
 
 /* ---------------- Horizontal bar chart (ranking) with PNG export ---------------- */
-function BarChartCard({ title, items, onDownloadName, unit, valueLabel }) {
+function BarChartCard({ title, items, onDownloadName, unit, allowNegative }) {
   const svgRef = useRef(null);
-  const maxVal = Math.max(...items.map((it) => it.value), 1);
+  const absMax = Math.max(...items.map((it) => Math.abs(it.value)), 1);
 
   const leftMargin = 220;
-  const rightMargin = 70;
-  const rowHeight = 34;
+  const rightMargin = allowNegative ? 140 : 100;
+  const rowHeight = allowNegative ? 42 : 34;
   const width = 820;
   const height = items.length * rowHeight + 30;
   const barAreaWidth = width - leftMargin - rightMargin;
+  // For charts with negative values, zero line sits at the centre of the bar area
+  const zeroX = allowNegative ? leftMargin + barAreaWidth / 2 : leftMargin;
 
   return (
     <div style={styles.card}>
@@ -2068,7 +2097,7 @@ function BarChartCard({ title, items, onDownloadName, unit, valueLabel }) {
         <div style={{ fontSize: 13, color: "#7A7568", fontWeight: 500 }}>{title}{unit ? `（單位：${unit}）` : ""}</div>
         <button
           style={styles.secondaryBtn}
-          onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, onDownloadName)}
+          onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, onDownloadName, `${title}${unit ? `（單位：${unit}）` : ""}`)}
           disabled={items.length === 0}
         >
           <Icon name="download" size={15} />
@@ -2080,18 +2109,35 @@ function BarChartCard({ title, items, onDownloadName, unit, valueLabel }) {
       ) : (
         <div style={{ overflowX: "auto" }}>
           <svg ref={svgRef} width={width} height={height} style={{ display: "block", background: "#FBF9F4" }}>
+            {allowNegative && (
+              <line x1={zeroX} x2={zeroX} y1={0} y2={height} stroke="#DDD6C6" strokeWidth={1} strokeDasharray="4 3" />
+            )}
             {items.map((it, i) => {
               const y = 12 + i * rowHeight;
-              const barW = (it.value / maxVal) * barAreaWidth;
-              const color = i === 0 ? "#B08968" : "#8A9A8E";
+              const isNeg = it.value < 0;
+              const barW = (Math.abs(it.value) / absMax) * (allowNegative ? barAreaWidth / 2 : barAreaWidth);
+              const barX = allowNegative ? (isNeg ? zeroX - barW : zeroX) : leftMargin;
+              const color = allowNegative
+                ? (isNeg ? "#C08081" : it.value === 0 ? "#D8D2C4" : i === 0 ? "#B08968" : "#8A9A8E")
+                : (i === 0 ? "#B08968" : "#8A9A8E");
+              const labelX = allowNegative
+                ? (isNeg ? zeroX - barW - 6 : zeroX + barW + 6)
+                : leftMargin + barW + 8;
+              const labelAnchor = allowNegative && isNeg ? "end" : "start";
+              const valueStr = allowNegative && it.value > 0 ? `+${formatChartNum(it.value)}` : formatChartNum(it.value);
               return (
                 <g key={it.id}>
-                  <text x={leftMargin - 12} y={y + rowHeight / 2 + 4} textAnchor="end" fontSize={12} fill="#3A3A38">
+                  <text x={leftMargin - 12} y={y + rowHeight / 2 - (it.subLabel ? 6 : 0)} textAnchor="end" fontSize={12} fill="#3A3A38">
                     {it.label.length > 16 ? it.label.slice(0, 16) + "…" : it.label}
                   </text>
-                  <rect x={leftMargin} y={y + 5} width={Math.max(barW, 2)} height={rowHeight - 14} rx={4} fill={color} />
-                  <text x={leftMargin + barW + 8} y={y + rowHeight / 2 + 4} fontSize={12} fill="#5C5847" fontWeight={600} fontFamily="'Space Grotesk', sans-serif">
-                    {formatChartNum(it.value)}
+                  {it.subLabel && (
+                    <text x={leftMargin - 12} y={y + rowHeight / 2 + 10} textAnchor="end" fontSize={10} fill="#A6A096">
+                      {it.subLabel}
+                    </text>
+                  )}
+                  <rect x={barX} y={y + 6} width={Math.max(barW, 2)} height={rowHeight - 16} rx={4} fill={color} />
+                  <text x={labelX} y={y + rowHeight / 2 + 4} textAnchor={labelAnchor} fontSize={12} fill={isNeg ? "#C08081" : "#5C5847"} fontWeight={600} fontFamily="'Space Grotesk', sans-serif">
+                    {valueStr}
                   </text>
                 </g>
               );
@@ -2243,6 +2289,37 @@ function TrendView({ pages, fanRecords, posts, groupRecords }) {
       .map((s) => ({ id: s.id, label: s.label, value: s.points[0] }))
       .sort((a, b) => b.value - a.value);
   }, [postSeries, singleMonth]);
+
+  //粉絲成長數圖表：選定區間內，每家粉絲團「最新一筆 - 最舊一筆」的淨增長
+  // 適用於單月（7/1-7/31）或跨月（6/1-7/31）兩種情況
+  const fanGrowthItems = useMemo(() => {
+    if (months.length === 0 || !rangeStart || !rangeEnd) return [];
+    const rangeStartDate = `${rangeStart}-01`;
+    // rangeEnd last day: just compare by YYYY-MM prefix
+    return selectedIds.map((id) => {
+      const page = pages.find((p) => p.id === id);
+      // All entries within the selected month range
+      const allEntries = (fanRecords[id] || [])
+        .filter((e) => {
+          const m = (e.date || "").slice(0, 7);
+          return m >= rangeStart && m <= rangeEnd;
+        })
+        .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+      if (allEntries.length < 1) return null;
+      const oldest = allEntries[0].count;
+      const newest = allEntries[allEntries.length - 1].count;
+      const growth = newest - oldest;
+      return {
+        id,
+        label: page?.name || "（已移除）",
+        value: growth,
+        oldest,
+        newest,
+      };
+    })
+      .filter((x) => x !== null)
+      .sort((a, b) => b.value - a.value);
+  }, [selectedIds, pages, fanRecords, months, rangeStart, rangeEnd]);
 
   // Top 10 most-engaged posts for the range's end month (mirrors 月報表's monthly TOP10), across all pages
   const topEngagedMonth = rangeEnd || (allMonths.length ? allMonths[allMonths.length - 1] : "");
@@ -2408,6 +2485,19 @@ function TrendView({ pages, fanRecords, posts, groupRecords }) {
             />
           )}
 
+          <BarChartCard
+            title={`粉絲成長數排名（${rangeStart === rangeEnd ? monthLabel(rangeStart) : `${monthLabel(rangeStart)} ～ ${monthLabel(rangeEnd)}`}，區間最新 − 最舊）`}
+            items={fanGrowthItems.map((it) => ({
+              ...it,
+              subLabel: it.oldest != null && it.newest != null
+                ? `${it.oldest.toLocaleString()} → ${it.newest.toLocaleString()} 人`
+                : "",
+            }))}
+            onDownloadName={`粉絲成長數_${rangeStart}_${rangeEnd}.png`}
+            unit="人"
+            allowNegative
+          />
+
           <div style={styles.card}>
             <div style={styles.filterLabel}>貼文數據指標</div>
             <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
@@ -2533,7 +2623,11 @@ function PostDetailChartSection({ pages, posts, allMonths }) {
           </div>
           <button
             style={styles.secondaryBtn}
-            onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, `${detailPage?.name || "粉絲團"}_${detailMonth}_${metricInfo.label}明細.png`)}
+            onClick={() => svgRef.current && downloadSvgAsPng(
+              svgRef.current,
+              `${detailPage?.name || "粉絲團"}_${detailMonth}_${metricInfo.label}明細.png`,
+              `${detailPage?.name || "—"} · ${detailMonth ? monthLabel(detailMonth) : "—"} · ${metricInfo.label}（${metricInfo.unit}）`
+            )}
             disabled={detailPosts.length === 0}
           >
             <Icon name="download" size={15} />
