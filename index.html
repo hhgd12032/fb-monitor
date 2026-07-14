@@ -16,6 +16,34 @@
 </head>
 <body>
 <div id="root"></div>
+
+<!-- Firebase SDK (loaded as module, exposed to global scope for use in Babel-transformed script) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDNzABu4w-hTJhm5zgrLXAhWX_WjQ1AcHs",
+    authDomain: "honda-fb-monitor.firebaseapp.com",
+    projectId: "honda-fb-monitor",
+    storageBucket: "honda-fb-monitor.firebasestorage.app",
+    messagingSenderId: "257661994948",
+    appId: "1:257661994948:web:1d1d5bd00e8f090ca30691"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Expose to global scope so the Babel-transformed app script can use them
+  window.__fbdb = db;
+  window.__fbdoc = doc;
+  window.__fbgetDoc = getDoc;
+  window.__fbsetDoc = setDoc;
+
+  // Signal that Firebase is ready
+  window.__fbReady = true;
+  window.dispatchEvent(new Event("fbReady"));
+</script>
 <script type="text/plain" id="app-source">
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -143,39 +171,64 @@ const Icon = ({ name, size = 16, className = "" }) => {
   }
 };
 
-/* ---------------- Persistence hook ----------------
-   Uses browser localStorage so this file works as a standalone page
-   (GitHub Pages, Netlify, or just opened locally) — no Claude.ai dependency.
-   Note: data lives only in this browser/device. Use "匯出 Excel" regularly to back up. */
-function isStorageAvailable() {
+/* ---------------- Firebase / Firestore persistence ----------------
+   All data lives in a single Firestore document per data type under
+   collection "fb_monitor". This means any user who opens the same
+   GitHub Pages URL sees and edits the same shared dataset. */
+
+const FB_COLLECTION = "fb_monitor";
+
+// Read one document from Firestore and return its "data" field, or fallback
+async function fbGet(docId, fallback) {
   try {
-    const testKey = "__fbmonitor_test__";
-    localStorage.setItem(testKey, "1");
-    localStorage.removeItem(testKey);
-    return true;
+    const db = window.__fbdb;
+    const ref = window.__fbdoc(db, FB_COLLECTION, docId);
+    const snap = await window.__fbgetDoc(ref);
+    if (snap.exists()) {
+      return snap.data().value ?? fallback;
+    }
+    return fallback;
   } catch (e) {
-    return false;
+    console.error("Firestore read error", docId, e);
+    return fallback;
   }
 }
 
-function useStoredState(key, fallback) {
-  const [state, setState] = useState(() => {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch (e) {
-      console.error("Failed to read localStorage for", key, e);
-      return fallback;
-    }
-  });
-  const [loaded] = useState(true); // localStorage is synchronous, so data is ready immediately
+// Write a value to a Firestore document's "data" field
+async function fbSet(docId, value) {
+  try {
+    const db = window.__fbdb;
+    const ref = window.__fbdoc(db, FB_COLLECTION, docId);
+    await window.__fbsetDoc(ref, { value });
+  } catch (e) {
+    console.error("Firestore write error", docId, e);
+  }
+}
 
-  const persist = useCallback((value) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      console.error("Storage write failed for", key, e);
-    }
+// Hook: loads initial value from Firestore, exposes a persist() function that writes back
+function useStoredState(key, fallback) {
+  const [state, setState] = useState(fallback);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      // Wait for Firebase to be ready (it initialises via a <script type="module">)
+      if (!window.__fbReady) {
+        await new Promise((resolve) => window.addEventListener("fbReady", resolve, { once: true }));
+      }
+      const value = await fbGet(key, fallback);
+      if (!cancelled) {
+        setState(value);
+        setLoaded(true);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [key]);
+
+  const persist = useCallback(async (value) => {
+    await fbSet(key, value);
   }, [key]);
 
   return [state, setState, persist, loaded];
@@ -186,7 +239,6 @@ function App() {
   const [fanRecords, setFanRecords, persistFanRecords, frLoaded] = useStoredState(STORAGE_KEYS.FAN_RECORDS, {});
   const [posts, setPosts, persistPosts, postsLoaded] = useStoredState(STORAGE_KEYS.POSTS, []);
   const [groupRecords, setGroupRecords, persistGroupRecords, grLoaded] = useStoredState(STORAGE_KEYS.GROUP_RECORDS, {});
-  const [storageOK] = useState(isStorageAvailable);
 
   const [view, setView] = useState("input"); // input | report | trend | pages
   const [month, setMonth] = useState(nowMonth());
@@ -237,13 +289,6 @@ function App() {
       <style>{fontImports}</style>
       <Sidebar view={view} setView={setView} pageCount={pages.length} />
       <main style={styles.main}>
-        {!storageOK && (
-          <div style={styles.storageWarning}>
-            ⚠ 這個瀏覽器/開啟方式目前無法儲存資料（可能是直接用 file:// 開啟檔案造成的限制）。
-            你輸入的內容暫時只存在這次畫面開著的期間，重新整理或關閉就會消失。
-            建議改用「匯出 Excel」開頭就先備份，或改成透過網址（例如部署到 GitHub Pages）開啟。
-          </div>
-        )}
         {view === "pages" && (
           <PagesView
             pages={pages}
@@ -339,8 +384,7 @@ function Sidebar({ view, setView, pageCount }) {
         ))}
       </div>
       <div style={styles.sidebarFoot}>
-        資料儲存在此瀏覽器本機，
-        <br />建議定期用「匯出 Excel」備份。
+        資料存於雲端，所有人開啟同一個網址即可共用同一份資料。
       </div>
     </nav>
   );
