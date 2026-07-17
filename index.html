@@ -1150,7 +1150,7 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
 function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month, setMonth, showToast }) {
   const [tab, setTab] = useState("posts"); // posts | fans
   const [selectedPageId, setSelectedPageId] = useState(pages[0]?.id || "");
-  const [draft, setDraft] = useState({ url: "", views: "", likes: "", comments: "", shares: "", source: "original", format: "image", date: "" });
+  const [draft, setDraft] = useState({ url: "", views: "", likes: "", comments: "", shares: "", source: "original", format: "image", star: false, date: "" });
   const urlRef = useRef(null);
 
   // editing an existing post
@@ -1177,7 +1177,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
     [posts, month, selectedPageId]
   );
 
-  const resetDraft = () => setDraft({ url: "", views: "", likes: "", comments: "", shares: "", source: draft.source, format: draft.format, date: draft.date });
+  const resetDraft = () => setDraft({ url: "", views: "", likes: "", comments: "", shares: "", source: draft.source, format: draft.format, star: false, date: draft.date });
 
   const addPost = () => {
     if (!selectedPageId) {
@@ -1188,10 +1188,6 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
     const likes = Number(draft.likes) || 0;
     const comments = Number(draft.comments) || 0;
     const shares = Number(draft.shares) || 0;
-    if (!draft.url.trim() && views === 0 && likes === 0 && comments === 0 && shares === 0) {
-      showToast("請至少輸入貼文連結或互動數字");
-      return;
-    }
     const entry = {
       id: uid(),
       pageId: selectedPageId,
@@ -1203,6 +1199,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
       source: draft.source,
       format: draft.format,
       type: draft.format, // keep legacy type field in sync for charts/reports
+      star: !!draft.star,
       date: draft.date || `${month}-01`,
       month,
     };
@@ -1230,6 +1227,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
       shares: p.shares || "",
       source: p.source || "original",
       format: p.format || p.type || "image",
+      star: !!p.star,
       date: p.date,
     });
   };
@@ -1249,7 +1247,8 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
       shares: Number(editDraft.shares) || 0,
       source: editDraft.source,
       format: editDraft.format,
-      type: editDraft.format, // keep legacy sync
+      type: editDraft.format,
+      star: !!editDraft.star,
       date: editDraft.date,
     };
     savePosts(posts.map((p) => (p.id === editingPostId ? { ...p, ...updated, month: updated.date.slice(0, 7) } : p)));
@@ -1352,6 +1351,8 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                   ))}
                 </select>
               </Field>
+            </div>
+            <div className="fbm-form-grid" style={{ ...styles.formGrid, marginTop: 10 }}>
               <Field label="貼文連結" style={{ gridColumn: "span 4" }}>
                 <input
                   ref={urlRef}
@@ -1362,6 +1363,8 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                   onKeyDown={(e) => e.key === "Enter" && addPost()}
                 />
               </Field>
+            </div>
+            <div style={{ ...styles.formGrid, display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginTop: 10 }}>
               <Field label="讚數">
                 <input
                   type="number"
@@ -1398,14 +1401,29 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                   onKeyDown={(e) => e.key === "Enter" && addPost()}
                 />
               </Field>
-              <div style={{ display: "flex", alignItems: "flex-end", gridColumn: "span 4" }}>
-                <button style={{ ...styles.primaryBtn, width: "100%" }} onClick={addPost}>
-                  <Icon name="plus" size={16} />
-                  新增並繼續
-                </button>
-              </div>
+              <Field label="點子王">
+                <div style={{ display: "flex", alignItems: "center", height: 38, paddingLeft: 4 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", userSelect: "none" }}>
+                    <input
+                      type="checkbox"
+                      checked={!!draft.star}
+                      onChange={(e) => setDraft({ ...draft, star: e.target.checked })}
+                      style={{ width: 18, height: 18, accentColor: "#B08968", cursor: "pointer" }}
+                    />
+                    <span style={{ fontSize: 13, color: draft.star ? "#B08968" : "#A6A096", fontWeight: draft.star ? 600 : 400 }}>
+                      {draft.star ? "⭐ 已標記" : "未標記"}
+                    </span>
+                  </label>
+                </div>
+              </Field>
             </div>
-            <div style={styles.hint}>按 Enter 可快速新增下一筆，粉絲團與類型設定會延續，方便連續輸入同一家的多篇貼文。觀看數只有影片/Reels類型才會有，靜態貼文可留空。</div>
+            <div style={{ marginTop: 14 }}>
+              <button style={{ ...styles.primaryBtn, width: "100%" }} onClick={addPost}>
+                <Icon name="plus" size={16} />
+                新增並繼續
+              </button>
+            </div>
+            <div style={{ ...styles.hint, marginTop: 10 }}>按 Enter 可快速新增下一筆，粉絲團與類型設定會延續。互動數欄位全部選填——月中可以先只記錄貼文連結，等數字穩定後再回來用「編輯」補填。</div>
           </div>
 
           <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
@@ -1427,6 +1445,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                     <th style={{ ...styles.th, textAlign: "right" }}>分享</th>
                     <th style={{ ...styles.th, textAlign: "right" }}>觀看數<br /><span style={styles.thSubLabel}>僅供參考</span></th>
                     <th style={{ ...styles.th, textAlign: "right" }}>互動總計<br /><span style={styles.thSubLabel}>讚+留言+分享</span></th>
+                    <th style={{ ...styles.th, textAlign: "center" }}>⭐</th>
                     <th style={{ ...styles.th, width: 70 }}></th>
                   </tr>
                 </thead>
@@ -1465,6 +1484,14 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                             <input type="number" style={{ ...styles.input, fontSize: 12.5, textAlign: "right", maxWidth: 90 }} value={editDraft.views} onChange={(e) => setEditDraft({ ...editDraft, views: e.target.value })} />
                           </td>
                           <td style={{ ...styles.td, textAlign: "right", color: "#A6A096", fontSize: 12.5 }}>—</td>
+                          <td style={{ ...styles.td, textAlign: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={!!editDraft.star}
+                              onChange={(e) => setEditDraft({ ...editDraft, star: e.target.checked })}
+                              style={{ width: 16, height: 16, accentColor: "#B08968", cursor: "pointer" }}
+                            />
+                          </td>
                           <td style={{ ...styles.td, textAlign: "right", whiteSpace: "nowrap" }}>
                             <button style={{ ...styles.iconBtn, color: "#7B8F77" }} onClick={commitEditPost} title="儲存">
                               <Icon name="save" size={14} />
@@ -1477,7 +1504,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                       );
                     }
                     return (
-                      <tr key={p.id} style={styles.tr}>
+                      <tr key={p.id} style={{ ...styles.tr, ...(p.star ? { background: "#FBF5EC" } : {}) }}>
                         <td style={styles.td}>{p.date}</td>
                         <td style={styles.td}>
                           <SourceTag source={p.source} />
@@ -1501,6 +1528,9 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                           {p.views ? p.views.toLocaleString() : "—"}
                         </td>
                         <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500 }}>{engagement(p)}</td>
+                        <td style={{ ...styles.td, textAlign: "center", fontSize: 15 }}>
+                          {p.star ? "⭐" : <span style={{ color: "#E6E1D6" }}>—</span>}
+                        </td>
                         <td style={{ ...styles.td, textAlign: "right", whiteSpace: "nowrap" }}>
                           <button style={styles.iconBtn} onClick={() => startEditPost(p)} title="編輯">
                             <Icon name="edit" size={14} />
