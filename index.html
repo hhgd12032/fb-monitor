@@ -80,6 +80,8 @@ const POST_FORMATS = [
   { value: "other", label: "其他" },
 ];
 
+const POST_CONTENT_TAGS = ["公告", "促銷", "交車", "小知識", "創意", "新車宣傳", "其他"];
+
 function nowMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -1150,7 +1152,7 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
 function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month, setMonth, showToast }) {
   const [tab, setTab] = useState("posts"); // posts | fans
   const [selectedPageId, setSelectedPageId] = useState(pages[0]?.id || "");
-  const [draft, setDraft] = useState({ url: "", views: "", likes: "", comments: "", shares: "", source: "original", format: "image", star: false, date: "" });
+  const [draft, setDraft] = useState({ url: "", views: "", likes: "", comments: "", shares: "", source: "original", format: "image", star: false, tags: [], date: "" });
   const urlRef = useRef(null);
 
   // editing an existing post
@@ -1177,7 +1179,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
     [posts, month, selectedPageId]
   );
 
-  const resetDraft = () => setDraft({ url: "", views: "", likes: "", comments: "", shares: "", source: draft.source, format: draft.format, star: false, date: draft.date });
+  const resetDraft = () => setDraft({ url: "", views: "", likes: "", comments: "", shares: "", source: draft.source, format: draft.format, star: false, tags: [], date: draft.date });
 
   const addPost = () => {
     if (!selectedPageId) {
@@ -1200,6 +1202,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
       format: draft.format,
       type: draft.format, // keep legacy type field in sync for charts/reports
       star: !!draft.star,
+      tags: draft.tags || [],
       date: draft.date || `${month}-01`,
       month,
     };
@@ -1228,6 +1231,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
       source: p.source || "original",
       format: p.format || p.type || "image",
       star: !!p.star,
+      tags: p.tags || [],
       date: p.date,
     });
   };
@@ -1249,6 +1253,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
       format: editDraft.format,
       type: editDraft.format,
       star: !!editDraft.star,
+      tags: editDraft.tags || [],
       date: editDraft.date,
     };
     savePosts(posts.map((p) => (p.id === editingPostId ? { ...p, ...updated, month: updated.date.slice(0, 7) } : p)));
@@ -1326,7 +1331,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
       ) : tab === "posts" ? (
         <>
           <div style={styles.card}>
-            <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "2fr 1fr 1fr 1fr" }}>
+            <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "2fr 1fr 1fr 1fr 2fr" }}>
               <Field label="粉絲團">
                 <select style={styles.input} value={selectedPageId} onChange={(e) => setSelectedPageId(e.target.value)}>
                   {pages.map((p) => (
@@ -1350,6 +1355,34 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
+              </Field>
+              <Field label="內容（可複選）">
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingTop: 2 }}>
+                  {POST_CONTENT_TAGS.map((tag) => {
+                    const active = (draft.tags || []).includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          const curr = draft.tags || [];
+                          setDraft({ ...draft, tags: active ? curr.filter((t) => t !== tag) : [...curr, tag] });
+                        }}
+                        style={{
+                          padding: "4px 10px", borderRadius: 7, border: "1px solid",
+                          fontSize: 12.5, cursor: "pointer", fontFamily: "'Noto Sans TC', sans-serif",
+                          fontWeight: active ? 600 : 400,
+                          background: active ? "#8A9A8E" : "#fff",
+                          color: active ? "#fff" : "#7A7568",
+                          borderColor: active ? "#8A9A8E" : "#DDD6C6",
+                          transition: "all 0.12s",
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
               </Field>
             </div>
             <div className="fbm-form-grid" style={{ ...styles.formGrid, marginTop: 10 }}>
@@ -1439,6 +1472,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                     <th style={styles.th}>日期</th>
                     <th style={styles.th}>類型</th>
                     <th style={styles.th}>形式</th>
+                    <th style={styles.th}>內容</th>
                     <th style={styles.th}>連結</th>
                     <th style={{ ...styles.th, textAlign: "right" }}>讚</th>
                     <th style={{ ...styles.th, textAlign: "right" }}>留言</th>
@@ -1467,6 +1501,22 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                             <select style={{ ...styles.input, fontSize: 12.5 }} value={editDraft.format} onChange={(e) => setEditDraft({ ...editDraft, format: e.target.value })}>
                               {POST_FORMATS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                             </select>
+                          </td>
+                          <td style={styles.td}>
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {POST_CONTENT_TAGS.map((tag) => {
+                                const active = (editDraft.tags || []).includes(tag);
+                                return (
+                                  <button key={tag} type="button"
+                                    onClick={() => {
+                                      const curr = editDraft.tags || [];
+                                      setEditDraft({ ...editDraft, tags: active ? curr.filter((t) => t !== tag) : [...curr, tag] });
+                                    }}
+                                    style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid", fontSize: 11.5, cursor: "pointer", fontFamily: "'Noto Sans TC', sans-serif", fontWeight: active ? 600 : 400, background: active ? "#8A9A8E" : "#fff", color: active ? "#fff" : "#7A7568", borderColor: active ? "#8A9A8E" : "#DDD6C6" }}
+                                  >{tag}</button>
+                                );
+                              })}
+                            </div>
                           </td>
                           <td style={styles.td}>
                             <input style={{ ...styles.input, fontSize: 12.5, minWidth: 140 }} value={editDraft.url} placeholder="貼文網址" onChange={(e) => setEditDraft({ ...editDraft, url: e.target.value })} />
@@ -1511,6 +1561,15 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                         </td>
                         <td style={styles.td}>
                           <FormatTag format={p.format || p.type} />
+                        </td>
+                        <td style={styles.td}>
+                          {(p.tags || []).length > 0 ? (
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {(p.tags || []).map((tag) => (
+                                <span key={tag} style={{ padding: "2px 8px", borderRadius: 6, background: "#EBE6D9", color: "#7A7568", fontSize: 11.5, fontWeight: 500 }}>{tag}</span>
+                              ))}
+                            </div>
+                          ) : <span style={{ color: "#D0CAC0" }}>—</span>}
                         </td>
                         <td style={styles.td}>
                           {p.url ? (
@@ -1881,6 +1940,7 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
         日期: p.date,
         類型: POST_SOURCES.find((t) => t.value === p.source)?.label || (p.source || ""),
         形式: POST_FORMATS.find((t) => t.value === (p.format || p.type))?.label || (p.format || p.type || ""),
+        內容標籤: (p.tags || []).join("、"),
         讚數: p.likes,
         留言數: p.comments,
         分享數: p.shares,
