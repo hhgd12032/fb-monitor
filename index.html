@@ -1302,6 +1302,89 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
         <MonthSwitcher month={month} setMonth={setMonth} />
       </Header>
 
+      {/* Edit Post Modal */}
+      {editingPostId && editDraft && (
+        <div style={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && cancelEditPost()}>
+          <div style={{ ...styles.modalCard, maxWidth: 680, width: "90vw" }}>
+            <div style={styles.modalHeader}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <Icon name="edit" size={17} />
+                <span style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 17 }}>修改貼文紀錄</span>
+              </div>
+              <button style={styles.iconBtn} onClick={cancelEditPost}><Icon name="x" size={18} /></button>
+            </div>
+            <div style={styles.modalBody}>
+              {/* Row 1: 日期 / 類型 / 形式 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
+                <Field label="日期">
+                  <input type="date" style={styles.input} value={editDraft.date} onChange={(e) => setEditDraft({ ...editDraft, date: e.target.value })} />
+                </Field>
+                <Field label="類型">
+                  <select style={styles.input} value={editDraft.source} onChange={(e) => setEditDraft({ ...editDraft, source: e.target.value })}>
+                    {POST_SOURCES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </Field>
+                <Field label="形式">
+                  <select style={styles.input} value={editDraft.format} onChange={(e) => setEditDraft({ ...editDraft, format: e.target.value })}>
+                    {POST_FORMATS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </Field>
+              </div>
+              {/* Row 2: 貼文連結 */}
+              <Field label="貼文連結" style={{ marginBottom: 14 }}>
+                <input style={styles.input} value={editDraft.url} placeholder="貼上貼文網址（選填）" onChange={(e) => setEditDraft({ ...editDraft, url: e.target.value })} />
+              </Field>
+              {/* Row 3: 內容 chips */}
+              <Field label="內容（可複選）" style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", gap: 7, flexWrap: "wrap", paddingTop: 2 }}>
+                  {POST_CONTENT_TAGS.map((tag) => {
+                    const active = (editDraft.tags || []).includes(tag);
+                    return (
+                      <button key={tag} type="button"
+                        onClick={() => {
+                          const curr = editDraft.tags || [];
+                          setEditDraft({ ...editDraft, tags: active ? curr.filter((t) => t !== tag) : [...curr, tag] });
+                        }}
+                        style={{ padding: "5px 12px", borderRadius: 8, border: "1px solid", fontSize: 13, cursor: "pointer", fontFamily: "'Noto Sans TC', sans-serif", fontWeight: active ? 600 : 400, background: active ? "#8A9A8E" : "#fff", color: active ? "#fff" : "#7A7568", borderColor: active ? "#8A9A8E" : "#DDD6C6", whiteSpace: "nowrap", transition: "all 0.12s" }}
+                      >{tag}</button>
+                    );
+                  })}
+                </div>
+              </Field>
+              {/* Row 4: 互動數 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>
+                <Field label="讚數">
+                  <input type="number" style={styles.input} value={editDraft.likes} onChange={(e) => setEditDraft({ ...editDraft, likes: e.target.value })} />
+                </Field>
+                <Field label="留言數">
+                  <input type="number" style={styles.input} value={editDraft.comments} onChange={(e) => setEditDraft({ ...editDraft, comments: e.target.value })} />
+                </Field>
+                <Field label="分享數">
+                  <input type="number" style={styles.input} value={editDraft.shares} onChange={(e) => setEditDraft({ ...editDraft, shares: e.target.value })} />
+                </Field>
+                <Field label="觀看數（影片用）">
+                  <input type="number" style={styles.input} value={editDraft.views} onChange={(e) => setEditDraft({ ...editDraft, views: e.target.value })} />
+                </Field>
+              </div>
+              {/* Row 5: 點子王 */}
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
+                <input type="checkbox" checked={!!editDraft.star} onChange={(e) => setEditDraft({ ...editDraft, star: e.target.checked })} style={{ width: 18, height: 18, accentColor: "#B08968", cursor: "pointer" }} />
+                <span style={{ fontSize: 13.5, color: editDraft.star ? "#B08968" : "#7A7568", fontWeight: editDraft.star ? 600 : 400 }}>
+                  {editDraft.star ? "⭐ 點子王（已標記）" : "點子王（未標記）"}
+                </span>
+              </label>
+            </div>
+            <div style={styles.modalFooter}>
+              <button style={styles.secondaryBtn} onClick={cancelEditPost}>取消</button>
+              <button style={styles.primaryBtn} onClick={commitEditPost}>
+                <Icon name="save" size={15} />
+                儲存修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {pendingDeletePostId && (
         <ConfirmDialog
           title="確認刪除貼文紀錄"
@@ -1331,7 +1414,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
       ) : tab === "posts" ? (
         <>
           <div style={styles.card}>
-            <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "2fr 1fr 1fr 1fr 2fr" }}>
+            <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "2fr 1fr 1fr 1fr" }}>
               <Field label="粉絲團">
                 <select style={styles.input} value={selectedPageId} onChange={(e) => setSelectedPageId(e.target.value)}>
                   {pages.map((p) => (
@@ -1356,6 +1439,18 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                   ))}
                 </select>
               </Field>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 14, marginTop: 10, alignItems: "start" }}>
+              <Field label="貼文連結">
+                <input
+                  ref={urlRef}
+                  style={styles.input}
+                  placeholder="貼上貼文網址（選填）"
+                  value={draft.url}
+                  onChange={(e) => setDraft({ ...draft, url: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && addPost()}
+                />
+              </Field>
               <Field label="內容（可複選）">
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingTop: 2 }}>
                   {POST_CONTENT_TAGS.map((tag) => {
@@ -1375,6 +1470,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                           background: active ? "#8A9A8E" : "#fff",
                           color: active ? "#fff" : "#7A7568",
                           borderColor: active ? "#8A9A8E" : "#DDD6C6",
+                          whiteSpace: "nowrap",
                           transition: "all 0.12s",
                         }}
                       >
@@ -1383,18 +1479,6 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                     );
                   })}
                 </div>
-              </Field>
-            </div>
-            <div className="fbm-form-grid" style={{ ...styles.formGrid, marginTop: 10 }}>
-              <Field label="貼文連結" style={{ gridColumn: "span 4" }}>
-                <input
-                  ref={urlRef}
-                  style={styles.input}
-                  placeholder="貼上貼文網址（選填）"
-                  value={draft.url}
-                  onChange={(e) => setDraft({ ...draft, url: e.target.value })}
-                  onKeyDown={(e) => e.key === "Enter" && addPost()}
-                />
               </Field>
             </div>
             <div style={{ ...styles.formGrid, display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14, marginTop: 10 }}>
@@ -1466,89 +1550,52 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
             {monthPosts.length === 0 ? (
               <EmptyState text="這個粉絲團本月還沒有輸入任何貼文。" />
             ) : (
-              <table style={styles.table}>
+              <div style={{ overflowX: "auto" }}>
+              <table style={{ ...styles.table, tableLayout: "fixed", minWidth: 960 }}>
                 <thead>
                   <tr>
-                    <th style={styles.th}>日期</th>
-                    <th style={styles.th}>類型</th>
-                    <th style={styles.th}>形式</th>
-                    <th style={styles.th}>內容</th>
-                    <th style={styles.th}>連結</th>
-                    <th style={{ ...styles.th, textAlign: "right" }}>讚</th>
-                    <th style={{ ...styles.th, textAlign: "right" }}>留言</th>
-                    <th style={{ ...styles.th, textAlign: "right" }}>分享</th>
-                    <th style={{ ...styles.th, textAlign: "right" }}>觀看數<br /><span style={styles.thSubLabel}>僅供參考</span></th>
-                    <th style={{ ...styles.th, textAlign: "right" }}>互動總計<br /><span style={styles.thSubLabel}>讚+留言+分享</span></th>
-                    <th style={{ ...styles.th, textAlign: "center" }}>⭐</th>
-                    <th style={{ ...styles.th, width: 70 }}></th>
+                    <th style={{ ...styles.th, width: 100 }}>日期</th>
+                    <th style={{ ...styles.th, width: 72 }}>類型</th>
+                    <th style={{ ...styles.th, width: 72 }}>形式</th>
+                    <th style={{ ...styles.th, width: 170 }}>內容</th>
+                    <th style={{ ...styles.th, width: 60 }}>連結</th>
+                    <th style={{ ...styles.th, width: 58, textAlign: "right" }}>讚</th>
+                    <th style={{ ...styles.th, width: 58, textAlign: "right" }}>留言</th>
+                    <th style={{ ...styles.th, width: 58, textAlign: "right" }}>分享</th>
+                    <th style={{ ...styles.th, width: 70, textAlign: "right" }}>觀看數<br /><span style={styles.thSubLabel}>僅供參考</span></th>
+                    <th style={{ ...styles.th, width: 78, textAlign: "right" }}>互動總計<br /><span style={styles.thSubLabel}>讚+留言+分享</span></th>
+                    <th style={{ ...styles.th, width: 32, textAlign: "center" }}>⭐</th>
+                    <th style={{ ...styles.th, width: 64 }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {monthPosts.map((p) => {
                     const isEditing = editingPostId === p.id;
                     if (isEditing) {
+                      // Just highlight the row being edited; actual editing happens in the modal below
                       return (
-                        <tr key={p.id} style={{ ...styles.tr, background: "#F3F0EA" }}>
+                        <tr key={p.id} style={{ ...styles.tr, background: "#EBF0EE", outline: "2px solid #8A9A8E", outlineOffset: -1 }}>
+                          <td style={styles.td}>{p.date}</td>
+                          <td style={styles.td}><SourceTag source={p.source} /></td>
+                          <td style={styles.td}><FormatTag format={p.format || p.type} /></td>
                           <td style={styles.td}>
-                            <input type="date" style={{ ...styles.input, fontSize: 12.5 }} value={editDraft.date} onChange={(e) => setEditDraft({ ...editDraft, date: e.target.value })} />
+                            {(p.tags || []).length > 0 ? (
+                              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                {(p.tags || []).map((tag) => (
+                                  <span key={tag} style={{ padding: "2px 8px", borderRadius: 6, background: "#8A9A8E", color: "#fff", fontSize: 11.5, fontWeight: 600 }}>{tag}</span>
+                                ))}
+                              </div>
+                            ) : <span style={{ color: "#D0CAC0" }}>—</span>}
                           </td>
-                          <td style={styles.td}>
-                            <select style={{ ...styles.input, fontSize: 12.5 }} value={editDraft.source} onChange={(e) => setEditDraft({ ...editDraft, source: e.target.value })}>
-                              {POST_SOURCES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                            </select>
-                          </td>
-                          <td style={styles.td}>
-                            <select style={{ ...styles.input, fontSize: 12.5 }} value={editDraft.format} onChange={(e) => setEditDraft({ ...editDraft, format: e.target.value })}>
-                              {POST_FORMATS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                            </select>
-                          </td>
-                          <td style={styles.td}>
-                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                              {POST_CONTENT_TAGS.map((tag) => {
-                                const active = (editDraft.tags || []).includes(tag);
-                                return (
-                                  <button key={tag} type="button"
-                                    onClick={() => {
-                                      const curr = editDraft.tags || [];
-                                      setEditDraft({ ...editDraft, tags: active ? curr.filter((t) => t !== tag) : [...curr, tag] });
-                                    }}
-                                    style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid", fontSize: 11.5, cursor: "pointer", fontFamily: "'Noto Sans TC', sans-serif", fontWeight: active ? 600 : 400, background: active ? "#8A9A8E" : "#fff", color: active ? "#fff" : "#7A7568", borderColor: active ? "#8A9A8E" : "#DDD6C6" }}
-                                  >{tag}</button>
-                                );
-                              })}
-                            </div>
-                          </td>
-                          <td style={styles.td}>
-                            <input style={{ ...styles.input, fontSize: 12.5, minWidth: 140 }} value={editDraft.url} placeholder="貼文網址" onChange={(e) => setEditDraft({ ...editDraft, url: e.target.value })} />
-                          </td>
-                          <td style={{ ...styles.td, textAlign: "right" }}>
-                            <input type="number" style={{ ...styles.input, fontSize: 12.5, textAlign: "right", maxWidth: 80 }} value={editDraft.likes} onChange={(e) => setEditDraft({ ...editDraft, likes: e.target.value })} />
-                          </td>
-                          <td style={{ ...styles.td, textAlign: "right" }}>
-                            <input type="number" style={{ ...styles.input, fontSize: 12.5, textAlign: "right", maxWidth: 80 }} value={editDraft.comments} onChange={(e) => setEditDraft({ ...editDraft, comments: e.target.value })} />
-                          </td>
-                          <td style={{ ...styles.td, textAlign: "right" }}>
-                            <input type="number" style={{ ...styles.input, fontSize: 12.5, textAlign: "right", maxWidth: 80 }} value={editDraft.shares} onChange={(e) => setEditDraft({ ...editDraft, shares: e.target.value })} />
-                          </td>
-                          <td style={{ ...styles.td, textAlign: "right" }}>
-                            <input type="number" style={{ ...styles.input, fontSize: 12.5, textAlign: "right", maxWidth: 90 }} value={editDraft.views} onChange={(e) => setEditDraft({ ...editDraft, views: e.target.value })} />
-                          </td>
-                          <td style={{ ...styles.td, textAlign: "right", color: "#A6A096", fontSize: 12.5 }}>—</td>
-                          <td style={{ ...styles.td, textAlign: "center" }}>
-                            <input
-                              type="checkbox"
-                              checked={!!editDraft.star}
-                              onChange={(e) => setEditDraft({ ...editDraft, star: e.target.checked })}
-                              style={{ width: 16, height: 16, accentColor: "#B08968", cursor: "pointer" }}
-                            />
-                          </td>
+                          <td style={styles.td}>{p.url ? <a href={p.url} target="_blank" rel="noreferrer" style={styles.link}><Icon name="link" size={13} /> 查看</a> : <span style={{ color: "#A6A096" }}>—</span>}</td>
+                          <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.likes ? "#3A3A38" : "#D0CAC0" }}>{p.likes ? p.likes.toLocaleString() : "—"}</td>
+                          <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.comments ? "#3A3A38" : "#D0CAC0" }}>{p.comments ? p.comments.toLocaleString() : "—"}</td>
+                          <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.shares ? "#3A3A38" : "#D0CAC0" }}>{p.shares ? p.shares.toLocaleString() : "—"}</td>
+                          <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.views ? "#A18A4C" : "#D0CAC0" }}>{p.views ? p.views.toLocaleString() : "—"}</td>
+                          <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: engagement(p) ? "#3A3A38" : "#D0CAC0" }}>{engagement(p) ? engagement(p).toLocaleString() : "—"}</td>
+                          <td style={{ ...styles.td, textAlign: "center" }}>{p.star ? "⭐" : <span style={{ color: "#E6E1D6" }}>—</span>}</td>
                           <td style={{ ...styles.td, textAlign: "right", whiteSpace: "nowrap" }}>
-                            <button style={{ ...styles.iconBtn, color: "#7B8F77" }} onClick={commitEditPost} title="儲存">
-                              <Icon name="save" size={14} />
-                            </button>
-                            <button style={styles.iconBtn} onClick={cancelEditPost} title="取消">
-                              <Icon name="x" size={14} />
-                            </button>
+                            <span style={{ fontSize: 11.5, color: "#8A9A8E", fontWeight: 600 }}>編輯中…</span>
                           </td>
                         </tr>
                       );
@@ -1580,13 +1627,21 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                             <span style={{ color: "#A6A096" }}>—</span>
                           )}
                         </td>
-                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.likes}</td>
-                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.comments}</td>
-                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{p.shares}</td>
-                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.views ? "#A18A4C" : "#A6A096", fontWeight: p.views ? 600 : 400 }}>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.likes ? "#3A3A38" : "#D0CAC0" }}>
+                          {p.likes ? p.likes.toLocaleString() : "—"}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.comments ? "#3A3A38" : "#D0CAC0" }}>
+                          {p.comments ? p.comments.toLocaleString() : "—"}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.shares ? "#3A3A38" : "#D0CAC0" }}>
+                          {p.shares ? p.shares.toLocaleString() : "—"}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.views ? "#A18A4C" : "#D0CAC0", fontWeight: p.views ? 600 : 400 }}>
                           {p.views ? p.views.toLocaleString() : "—"}
                         </td>
-                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500 }}>{engagement(p)}</td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500, color: engagement(p) ? "#3A3A38" : "#D0CAC0" }}>
+                          {engagement(p) ? engagement(p).toLocaleString() : "—"}
+                        </td>
                         <td style={{ ...styles.td, textAlign: "center", fontSize: 15 }}>
                           {p.star ? "⭐" : <span style={{ color: "#E6E1D6" }}>—</span>}
                         </td>
@@ -1603,6 +1658,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </>
@@ -3389,10 +3445,10 @@ const styles = {
   tagBad: { fontSize: 11, background: "#F7E9E8", color: "#A85D5D", padding: "2px 8px", borderRadius: 6, fontWeight: 500 },
 
   table: { width: "100%", borderCollapse: "collapse", fontSize: 13.5 },
-  th: { textAlign: "left", padding: "11px 18px", color: "#9C9684", fontWeight: 500, fontSize: 12, borderBottom: "1px solid #E6E1D6", whiteSpace: "nowrap" },
+  th: { textAlign: "left", padding: "9px 12px", color: "#9C9684", fontWeight: 500, fontSize: 12, borderBottom: "1px solid #E6E1D6", whiteSpace: "nowrap" },
   thSubLabel: { fontSize: 10, color: "#B0A98F", fontWeight: 400 },
   tr: { borderBottom: "1px solid #EFEAE0" },
-  td: { padding: "11px 18px", color: "#3A3A38" },
+  td: { padding: "9px 12px", color: "#3A3A38" },
   tag: { fontSize: 11.5, background: "#EBE6D9", color: "#7A7568", padding: "2px 8px", borderRadius: 6 },
   typeTag: { display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: "#7A7568" },
   link: { display: "inline-flex", alignItems: "center", gap: 4, color: "#8A9A8E", textDecoration: "none", fontSize: 12.5 },
