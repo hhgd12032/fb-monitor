@@ -1707,21 +1707,29 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                   <tr>
                     <th style={styles.th}>日期</th>
                     <th style={{ ...styles.th, textAlign: "right" }}>粉絲人數</th>
+                    <th style={{ ...styles.th, textAlign: "right" }}>增減</th>
                     <th style={{ ...styles.th, width: 40 }}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {fanEntriesThisMonth.map((e) => (
-                    <tr key={e.id} style={styles.tr}>
-                      <td style={styles.td}>{e.date}</td>
-                      <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{e.count.toLocaleString()}</td>
-                      <td style={{ ...styles.td, textAlign: "right" }}>
-                        <button style={{ ...styles.iconBtn, color: "#C08081" }} onClick={() => removeFanEntry(fanPageId, e.id)}>
-                          <Icon name="trash" size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {fanEntriesThisMonth.map((e, i) => {
+                    const first = fanEntriesThisMonth[0];
+                    const diff = i > 0 ? e.count - first.count : null;
+                    return (
+                      <tr key={e.id} style={styles.tr}>
+                        <td style={styles.td}>{e.date}</td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{e.count.toLocaleString()}</td>
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: diff == null ? "#A6A096" : diff >= 0 ? "#7B8F77" : "#C08081" }}>
+                          {diff == null ? "—" : (diff >= 0 ? "+" : "") + diff.toLocaleString()}
+                        </td>
+                        <td style={{ ...styles.td, textAlign: "right" }}>
+                          <button style={{ ...styles.iconBtn, color: "#C08081" }} onClick={() => removeFanEntry(fanPageId, e.id)}>
+                            <Icon name="trash" size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -1735,13 +1743,16 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                   <th style={styles.th}>粉絲團</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>最新人數</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>量測日期</th>
+                  <th style={{ ...styles.th, textAlign: "right" }}>本月增減</th>
                   <th style={{ ...styles.th, textAlign: "right" }}>本月筆數</th>
                 </tr>
               </thead>
               <tbody>
                 {pages.map((p) => {
-                  const all = entriesInMonth(fanRecords, p.id, month);
+                  const all = entriesInMonth(fanRecords, p.id, month)
+                    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
                   const latest = all.length ? all[all.length - 1] : null;
+                  const diff = all.length > 1 ? all[all.length - 1].count - all[0].count : null;
                   return (
                     <tr key={p.id} style={styles.tr}>
                       <td style={styles.td}>{p.name}</td>
@@ -1749,6 +1760,9 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
                         {latest ? latest.count.toLocaleString() : "—"}
                       </td>
                       <td style={{ ...styles.td, textAlign: "right", color: "#A6A096" }}>{latest ? latest.date : "—"}</td>
+                      <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: diff == null ? "#A6A096" : diff >= 0 ? "#7B8F77" : "#C08081" }}>
+                        {diff == null ? (all.length === 1 ? "僅一筆" : "—") : (diff >= 0 ? "+" : "") + diff.toLocaleString()}
+                      </td>
                       <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: "#A6A096" }}>{all.length}</td>
                     </tr>
                   );
@@ -1845,18 +1859,19 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
   );
 
   const fanGrowth = useMemo(() => {
-    const prevMonth = shiftMonth(month, -1);
     return pages
       .map((p) => {
-        const curEntry = latestInMonth(fanRecords, p.id, month);
-        const prevEntry = latestInMonth(fanRecords, p.id, prevMonth);
-        const cur = curEntry?.count;
-        const prev = prevEntry?.count;
-        const diff = typeof cur === "number" && typeof prev === "number" ? cur - prev : null;
-        const pct = diff != null && prev > 0 ? (diff / prev) * 100 : null;
-        return { page: p, cur, curDate: curEntry?.date, prev, diff, pct, group: getGroup(p.id) };
+        const entries = entriesInMonth(fanRecords, p.id, month)
+          .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+        if (entries.length === 0) return null;
+        const first = entries[0];
+        const last = entries[entries.length - 1];
+        const cur = last.count;
+        const diff = entries.length > 1 ? last.count - first.count : null;
+        const pct = diff != null && first.count > 0 ? (diff / first.count) * 100 : null;
+        return { page: p, cur, curDate: last.date, firstDate: first.date, firstCount: first.count, diff, pct, group: getGroup(p.id) };
       })
-      .filter((r) => r.cur != null)
+      .filter((r) => r !== null)
       .sort((a, b) => (b.diff ?? -Infinity) - (a.diff ?? -Infinity));
   }, [pages, fanRecords, month, monthGroups]);
 
@@ -1872,6 +1887,12 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
     const groupPageIds = new Set(pagesByGroup[activeGroup]?.map((p) => p.id) || []);
     return monthPosts.filter((p) => groupPageIds.has(p.pageId));
   }, [monthPosts, activeGroup, pagesByGroup]);
+
+  // 點子王 posts filtered by active group
+  const starPostsFiltered = useMemo(() =>
+    monthPostsFiltered.filter((p) => p.star),
+    [monthPostsFiltered]
+  );
 
   // All posts for this group sorted by engagement (no limit)
   const postsEngagedFiltered = useMemo(
@@ -1978,16 +1999,18 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
         粉絲團網址: r.page.url || "",
         法人集團: r.page.category || "",
         地區: r.page.region || "",
-        本月粉絲數: r.cur ?? "",
-        量測日期: r.curDate ?? "",
-        上月粉絲數: r.prev ?? "",
-        增減人數: r.diff ?? "",
+        最新粉絲數: r.cur ?? "",
+        最新量測日期: r.curDate ?? "",
+        最舊粉絲數: r.firstCount ?? "",
+        最舊量測日期: r.firstDate ?? "",
+        增減人數: r.diff != null ? r.diff : "僅一筆",
         增減百分比: r.pct != null ? `${r.pct.toFixed(2)}%` : "",
       });
 
       // Helper: post row
       const toPostRow = (p, i) => ({
         排名: i + 1,
+        點子王: p.star ? "⭐" : "",
         粉絲團: pageMap[p.pageId]?.name || "",
         競賽組別: getGroup(p.pageId) || "未參加",
         粉絲團網址: pageMap[p.pageId]?.url || "",
@@ -2106,9 +2129,9 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
                 <th style={styles.th}>排名</th>
                 <th style={styles.th}>粉絲團</th>
                 {activeGroup === "" && hasGroupData && <th style={{ ...styles.th, textAlign: "center", width: 72 }}>組別</th>}
-                <th style={{ ...styles.th, textAlign: "right" }}>本月人數</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>量測日期</th>
-                <th style={{ ...styles.th, textAlign: "right" }}>增減</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>最新人數</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>區間</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>增減人數</th>
                 <th style={{ ...styles.th, textAlign: "right" }}>增減率</th>
               </tr>
             </thead>
@@ -2128,9 +2151,13 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
                       </td>
                     )}
                     <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{r.cur?.toLocaleString()}</td>
-                    <td style={{ ...styles.td, textAlign: "right", color: "#A6A096", fontSize: 12.5 }}>{r.curDate}</td>
+                    <td style={{ ...styles.td, textAlign: "right", color: "#A6A096", fontSize: 12 }}>
+                      {r.diff != null
+                        ? <span>{r.firstDate}<br />→ {r.curDate}</span>
+                        : <span>{r.curDate}</span>}
+                    </td>
                     <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.diff == null ? "#A6A096" : r.diff >= 0 ? "#7B8F77" : "#C08081" }}>
-                      {r.diff == null ? "—" : (r.diff >= 0 ? "+" : "") + r.diff.toLocaleString()}
+                      {r.diff == null ? "僅一筆" : (r.diff >= 0 ? "+" : "") + r.diff.toLocaleString()}
                     </td>
                     <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.pct == null ? "#A6A096" : r.pct >= 0 ? "#7B8F77" : "#C08081" }}>
                       {r.pct == null ? "—" : `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%`}
@@ -2154,6 +2181,16 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
           <PostRankTable posts={postsEngagedFiltered} pageMap={pageMap} metric={engagement} metricLabel="互動總計" showGroup={activeGroup === "" && hasGroupData} getGroup={getGroup} collapsible />
         )}
       </div>
+
+      {/* 點子王列表 — 全體和A/B/C都顯示 */}
+      <SectionTitle icon="spark" title={`⭐ 點子王貼文${activeGroup ? `（${activeGroup} 組）` : "（全體）"}`} />
+      {starPostsFiltered.length > 0 ? (
+        <PostRankTable posts={starPostsFiltered} pageMap={pageMap} metric={engagement} metricLabel="互動總計" showGroup={activeGroup === "" && hasGroupData} getGroup={getGroup} collapsible />
+      ) : (
+        <div style={{ ...styles.card, color: "#A6A096", fontSize: 13.5, padding: "14px 20px" }}>
+          本月{activeGroup ? `${activeGroup} 組` : ""}尚無點子王貼文。
+        </div>
+      )}
 
       {/* 最高讚 TOP10 + AI 提示詞 — 只在「全體」分頁顯示 */}
       {activeGroup === "" && (
