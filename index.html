@@ -284,6 +284,9 @@ function App() {
     persistGroupRecords(next);
   }, [persistGroupRecords, setGroupRecords]);
 
+  // visiblePages excludes hidden pages — used by all views except PagesView
+  const visiblePages = useMemo(() => pages.filter((p) => !p.hidden), [pages]);
+
   const pageMap = useMemo(() => {
     const m = {};
     pages.forEach((p) => (m[p.id] = p));
@@ -301,7 +304,7 @@ function App() {
   return (
     <div style={styles.shell}>
       <style>{fontImports}</style>
-      <Sidebar view={view} setView={setView} pageCount={pages.length} />
+      <Sidebar view={view} setView={setView} pageCount={visiblePages.length} />
       <main className="fbm-main" style={styles.main}>
         {view === "pages" && (
           <PagesView
@@ -318,7 +321,7 @@ function App() {
         )}
         {view === "input" && (
           <InputView
-            pages={pages}
+            pages={visiblePages}
             posts={posts}
             savePosts={savePosts}
             fanRecords={fanRecords}
@@ -330,7 +333,7 @@ function App() {
         )}
         {view === "report" && (
           <ReportView
-            pages={pages}
+            pages={visiblePages}
             posts={posts}
             fanRecords={fanRecords}
             groupRecords={groupRecords}
@@ -340,7 +343,7 @@ function App() {
           />
         )}
         {view === "trend" && (
-          <TrendView pages={pages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords} />
+          <TrendView pages={visiblePages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords} />
         )}
         {view === "settings" && (
           <SettingsView
@@ -779,10 +782,55 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
   const [editCategory, setEditCategory] = useState("");
   const [editRegion, setEditRegion] = useState("");
   const [showImport, setShowImport] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState(null); // page id awaiting delete confirmation
-  const [groupMonth, setGroupMonth] = useState(nowMonth()); // which month's group assignments to show/edit
-  const [filterGroup, setFilterGroup] = useState(""); // "" | "A" | "B" | "C" | "none"
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+  const [groupMonth, setGroupMonth] = useState(nowMonth());
+  const [filterGroup, setFilterGroup] = useState("");
+  const [dragOverId, setDragOverId] = useState(null);
+  const dragIdRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Toggle hidden status of a page
+  const toggleHidden = (id) => {
+    const p = pages.find((x) => x.id === id);
+    savePages(pages.map((x) => x.id === id ? { ...x, hidden: !x.hidden } : x));
+    showToast(p?.hidden ? `已取消隱藏「${p?.name}」` : `已隱藏「${p?.name}」`);
+  };
+
+  // Move a page up or down in the list
+  const movePage = (id, dir) => {
+    const idx = pages.findIndex((p) => p.id === id);
+    if (idx < 0) return;
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= pages.length) return;
+    const next = [...pages];
+    [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+    savePages(next);
+  };
+
+  // Drag handlers
+  const onDragStart = (e, id) => {
+    dragIdRef.current = id;
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const onDragOver = (e, id) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverId(id);
+  };
+  const onDrop = (e, targetId) => {
+    e.preventDefault();
+    const srcId = dragIdRef.current;
+    if (!srcId || srcId === targetId) { setDragOverId(null); return; }
+    const srcIdx = pages.findIndex((p) => p.id === srcId);
+    const tgtIdx = pages.findIndex((p) => p.id === targetId);
+    const next = [...pages];
+    const [moved] = next.splice(srcIdx, 1);
+    next.splice(tgtIdx, 0, moved);
+    savePages(next);
+    setDragOverId(null);
+    dragIdRef.current = null;
+  };
+  const onDragEnd = () => { setDragOverId(null); dragIdRef.current = null; };
 
   const setGroupForPage = (pageId, group) => {
     const monthGroups = { ...(groupRecords[groupMonth] || {}), [pageId]: group };
@@ -839,6 +887,8 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
   const categories = useMemo(() => [...new Set(pages.map((p) => p.category).filter(Boolean))].sort(), [pages]);
   const regions = useMemo(() => [...new Set(pages.map((p) => p.region).filter(Boolean))].sort(), [pages]);
 
+  const hiddenCount = useMemo(() => pages.filter((p) => p.hidden).length, [pages]);
+
   const groupCounts = useMemo(() => {
     const mg = groupRecords[groupMonth] || {};
     const counts = { A: 0, B: 0, C: 0, none: 0 };
@@ -855,11 +905,7 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
     const matchesCategory = !filterCategory || p.category === filterCategory;
     const matchesRegion = !filterRegion || p.region === filterRegion;
     const currentGroup = groupRecords[groupMonth]?.[p.id] || "";
-    const matchesGroup = !filterGroup
-      ? true
-      : filterGroup === "none"
-        ? !currentGroup
-        : currentGroup === filterGroup;
+    const matchesGroup = !filterGroup ? true : filterGroup === "none" ? !currentGroup : currentGroup === filterGroup;
     return matchesQuery && matchesCategory && matchesRegion && matchesGroup;
   });
   const currentMonth = nowMonth();
@@ -868,7 +914,7 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
     <div style={styles.viewWrap}>
       <Header
         title="粉絲團清單"
-        subtitle={`目前追蹤 ${pages.length} 家粉絲團，可隨時新增或移除`}
+        subtitle={`目前追蹤 ${pages.length} 家粉絲團${hiddenCount > 0 ? `，其中 ${hiddenCount} 家已隱藏（不顯示於輸入/報表/趨勢）` : ""}`}
       >
         <button style={styles.secondaryBtn} onClick={() => setShowImport(true)}>
           <Icon name="download" size={16} />
@@ -1034,85 +1080,55 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
           <table style={styles.table}>
             <thead>
               <tr>
+                <th style={{ ...styles.th, width: 32 }}></th>
                 <th style={styles.th}>粉絲團</th>
                 <th style={{ ...styles.th, width: 90 }}>法人</th>
                 <th style={{ ...styles.th, width: 90 }}>地區</th>
                 <th style={{ ...styles.th, textAlign: "center", width: 110, whiteSpace: "nowrap" }}>{monthLabel(groupMonth)}<br /><span style={styles.thSubLabel}>競賽組別</span></th>
-                <th style={{ ...styles.th, textAlign: "right", width: 130, whiteSpace: "nowrap" }}>最新粉絲數</th>
-                <th style={{ ...styles.th, width: 90 }}></th>
+                <th style={{ ...styles.th, textAlign: "right", width: 110, whiteSpace: "nowrap" }}>最新粉絲數</th>
+                <th style={{ ...styles.th, width: 120 }}></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => {
+              {filtered.map((p, idx) => {
                 const latest = latestInMonth(fanRecords, p.id, currentMonth);
                 const group = groupRecords[groupMonth]?.[p.id] || "";
                 const groupColor = group === "A" ? "#5C6B73" : group === "B" ? "#B08968" : group === "C" ? "#8A9A8E" : "#A6A096";
+                const isHidden = !!p.hidden;
+                const isDragOver = dragOverId === p.id;
                 return (
-                  <tr key={p.id} style={styles.tr}>
+                  <tr
+                    key={p.id}
+                    style={{ ...styles.tr, opacity: isHidden ? 0.45 : 1, background: isDragOver ? "#EBF0EE" : isHidden ? "#F8F6F2" : undefined, outline: isDragOver ? "2px solid #8A9A8E" : undefined }}
+                    draggable
+                    onDragStart={(e) => onDragStart(e, p.id)}
+                    onDragOver={(e) => onDragOver(e, p.id)}
+                    onDrop={(e) => onDrop(e, p.id)}
+                    onDragEnd={onDragEnd}
+                  >
+                    {/* Drag handle */}
+                    <td style={{ ...styles.td, textAlign: "center", cursor: "grab", color: "#C4B8A4", userSelect: "none", fontSize: 16 }} title="拖曳排序">⠿</td>
                     <td style={styles.td}>
                       {editingId === p.id ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
-                          <input
-                            autoFocus
-                            style={styles.input}
-                            value={editName}
-                            placeholder="粉絲團名稱"
-                            onChange={(e) => setEditName(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && commitEdit()}
-                          />
-                          <input
-                            style={{ ...styles.input, fontSize: 12.5 }}
-                            value={editUrl}
-                            placeholder="粉絲團網址"
-                            onChange={(e) => setEditUrl(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && commitEdit()}
-                          />
-                          <div style={{ display: "flex", gap: 6 }}>
-                            <input
-                              style={{ ...styles.input, fontSize: 12.5 }}
-                              value={editCategory}
-                              placeholder="法人/集團"
-                              onChange={(e) => setEditCategory(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && commitEdit()}
-                            />
-                            <input
-                              style={{ ...styles.input, fontSize: 12.5 }}
-                              value={editRegion}
-                              placeholder="地區"
-                              onChange={(e) => setEditRegion(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && commitEdit()}
-                              onBlur={commitEdit}
-                            />
-                          </div>
+                          <input autoFocus style={styles.input} value={editName} placeholder="粉絲團名稱" onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && commitEdit()} />
+                          <input style={{ ...styles.input, fontSize: 12.5 }} value={editUrl} placeholder="粉絲團網址" onChange={(e) => setEditUrl(e.target.value)} />
+                          <input style={{ ...styles.input, fontSize: 12.5 }} value={editCategory} placeholder="法人/集團（選填）" onChange={(e) => setEditCategory(e.target.value)} />
+                          <input style={{ ...styles.input, fontSize: 12.5 }} value={editRegion} placeholder="地區（選填）" onChange={(e) => setEditRegion(e.target.value)} />
                         </div>
                       ) : (
-                        <div>
-                          <div style={{ fontWeight: 500 }}>{p.name}</div>
-                          {p.url && (
-                            <a href={p.url} target="_blank" rel="noreferrer" style={{ ...styles.link, marginTop: 2 }}>
-                              <Icon name="link" size={12} /> {p.url.replace(/^https?:\/\//, "").slice(0, 36)}
-                            </a>
-                          )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                          {isHidden && <span style={{ fontSize: 10, background: "#DDD6C6", color: "#7A7568", padding: "1px 6px", borderRadius: 4, fontWeight: 600, flexShrink: 0 }}>隱藏中</span>}
+                          {p.url ? <a href={p.url} target="_blank" rel="noreferrer" style={{ ...styles.link, color: "#3A3A38", fontWeight: 500, textDecoration: "none" }}>{p.name}</a> : <span style={{ fontWeight: 500 }}>{p.name}</span>}
                         </div>
                       )}
                     </td>
-                    <td style={styles.td}>
-                      {editingId !== p.id && <span style={styles.tag}>{p.category || "—"}</span>}
-                    </td>
-                    <td style={styles.td}>
-                      {editingId !== p.id && <span style={styles.tag}>{p.region || "—"}</span>}
-                    </td>
+                    <td style={styles.td}>{editingId !== p.id && <span style={styles.tag}>{p.category || "—"}</span>}</td>
+                    <td style={styles.td}>{editingId !== p.id && <span style={styles.tag}>{p.region || "—"}</span>}</td>
                     <td style={{ ...styles.td, textAlign: "center" }}>
                       {editingId !== p.id && (
-                        <select
-                          style={{
-                            padding: "5px 8px", borderRadius: 7, border: "1px solid #DDD6C6",
-                            background: "#fff", fontSize: 12.5, cursor: "pointer",
-                            fontWeight: group ? 600 : 400, color: groupColor,
-                          }}
-                          value={group}
-                          onChange={(e) => setGroupForPage(p.id, e.target.value)}
-                        >
+                        <select style={{ padding: "5px 8px", borderRadius: 7, border: "1px solid #DDD6C6", background: "#fff", fontSize: 12.5, cursor: "pointer", fontWeight: group ? 600 : 400, color: groupColor }}
+                          value={group} onChange={(e) => setGroupForPage(p.id, e.target.value)}>
                           <option value="">—</option>
                           <option value="A">A 組</option>
                           <option value="B">B 組</option>
@@ -1123,19 +1139,20 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
                     <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>
                       {latest ? latest.count.toLocaleString() : "—"}
                     </td>
-                    <td style={{ ...styles.td, textAlign: "right" }}>
+                    <td style={{ ...styles.td, textAlign: "right", whiteSpace: "nowrap" }}>
                       {editingId === p.id ? (
-                        <button style={{ ...styles.iconBtn, color: "#7B8F77" }} onClick={commitEdit} title="儲存">
-                          <Icon name="save" size={15} />
-                        </button>
+                        <button style={{ ...styles.iconBtn, color: "#7B8F77" }} onClick={commitEdit} title="儲存"><Icon name="save" size={15} /></button>
                       ) : (
-                        <button style={styles.iconBtn} onClick={() => startEdit(p)} title="編輯">
-                          <Icon name="edit" size={15} />
-                        </button>
+                        <>
+                          <button style={styles.iconBtn} onClick={() => movePage(p.id, -1)} disabled={idx === 0} title="上移" aria-label="上移">▲</button>
+                          <button style={styles.iconBtn} onClick={() => movePage(p.id, 1)} disabled={idx === filtered.length - 1} title="下移" aria-label="下移">▼</button>
+                          <button style={{ ...styles.iconBtn, color: isHidden ? "#B08968" : "#7A7568" }} onClick={() => toggleHidden(p.id)} title={isHidden ? "取消隱藏" : "隱藏"}>
+                            {isHidden ? "👁" : "🙈"}
+                          </button>
+                          <button style={styles.iconBtn} onClick={() => startEdit(p)} title="編輯"><Icon name="edit" size={15} /></button>
+                          <button style={{ ...styles.iconBtn, color: "#C08081" }} onClick={() => requestDeletePage(p.id)} title="移除"><Icon name="trash" size={15} /></button>
+                        </>
                       )}
-                      <button style={{ ...styles.iconBtn, color: "#C08081" }} onClick={() => requestDeletePage(p.id)} title="移除">
-                        <Icon name="trash" size={15} />
-                      </button>
                     </td>
                   </tr>
                 );
@@ -1906,6 +1923,21 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
     return { totalFans, totalGrowth, postCount: monthPosts.length };
   }, [fanGrowth, monthPosts]);
 
+  // Per-page content tag distribution for the content analysis table
+  const contentDist = useMemo(() => {
+    return pages.map((p) => {
+      const pagePosts = monthPosts.filter((post) => post.pageId === p.id);
+      const tagCounts = {};
+      POST_CONTENT_TAGS.forEach((t) => { tagCounts[t] = 0; });
+      let untagged = 0;
+      pagePosts.forEach((post) => {
+        const tags = post.tags || [];
+        if (tags.length === 0) { untagged++; } else { tags.forEach((t) => { if (tagCounts[t] != null) tagCounts[t]++; }); }
+      });
+      return { page: p, total: pagePosts.length, tagCounts, untagged, group: getGroup(p.id) };
+    }).filter((r) => r.total > 0);
+  }, [pages, monthPosts, monthGroups]);
+
   /* ---------------- AI analysis prompt generator ---------------- */
   const [promptPageIds, setPromptPageIds] = useState([]);
   const [promptQuery, setPromptQuery] = useState("");
@@ -2195,6 +2227,55 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
       {/* 最高讚 TOP10 + AI 提示詞 — 只在「全體」分頁顯示 */}
       {activeGroup === "" && (
         <>
+          <SectionTitle icon="chart" title="各粉絲團貼文內容分佈" />
+          <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ ...styles.table, tableLayout: "auto", minWidth: 700 }}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>粉絲團</th>
+                    {hasGroupData && <th style={{ ...styles.th, textAlign: "center", width: 56 }}>組別</th>}
+                    <th style={{ ...styles.th, textAlign: "right", width: 64 }}>總篇數</th>
+                    {POST_CONTENT_TAGS.map((tag) => (
+                      <th key={tag} style={{ ...styles.th, textAlign: "right", width: 64 }}>{tag}</th>
+                    ))}
+                    <th style={{ ...styles.th, textAlign: "right", width: 64 }}>未標記</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contentDist.map((r) => {
+                    const groupColors = { A: "#3D6A63", B: "#8A5E3C", C: "#5E4A7A" };
+                    const groupBgs = { A: "#DDE5E2", B: "#EDE4D6", C: "#E2DDE8" };
+                    return (
+                      <tr key={r.page.id} style={styles.tr}>
+                        <td style={styles.td}><PageNameCell page={r.page} /></td>
+                        {hasGroupData && (
+                          <td style={{ ...styles.td, textAlign: "center" }}>
+                            {r.group ? (
+                              <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 24, height: 24, borderRadius: 6, background: groupBgs[r.group], color: groupColors[r.group], fontSize: 11, fontWeight: 700 }}>{r.group}</span>
+                            ) : <span style={{ color: "#D0CAC0" }}>—</span>}
+                          </td>
+                        )}
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>{r.total}</td>
+                        {POST_CONTENT_TAGS.map((tag) => (
+                          <td key={tag} style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.tagCounts[tag] > 0 ? "#3A3A38" : "#D0CAC0" }}>
+                            {r.tagCounts[tag] > 0 ? r.tagCounts[tag] : "—"}
+                          </td>
+                        ))}
+                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.untagged > 0 ? "#A6A096" : "#D0CAC0" }}>
+                          {r.untagged > 0 ? r.untagged : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {contentDist.length === 0 && (
+                    <tr><td colSpan={POST_CONTENT_TAGS.length + (hasGroupData ? 4 : 3)} style={{ ...styles.td, color: "#A6A096", textAlign: "center", padding: 20 }}>本月尚無貼文紀錄</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <SectionTitle icon="heart" title="本月最高讚貼文 TOP 10" />
           <PostRankTable posts={topLiked} pageMap={pageMap} metric="likes" metricLabel="讚數" showGroup={hasGroupData} getGroup={getGroup} />
 
@@ -3000,10 +3081,141 @@ function TrendView({ pages, fanRecords, posts, groupRecords }) {
             unit="互動數"
           />
 
+          <ContentDistChartSection pages={pages} posts={posts} allMonths={allMonths} />
           <PostDetailChartSection pages={pages} posts={posts} allMonths={allMonths} />
         </>
       )}
     </div>
+  );
+}
+
+/* ---------------- Content distribution stacked bar chart (per page, per month) ---------------- */
+const TAG_COLORS = {
+  "公告":   "#8A9A8E",
+  "促銷":   "#B08968",
+  "交車":   "#5C6B73",
+  "小知識": "#A18A4C",
+  "創意":   "#9A8AA6",
+  "新車宣傳":"#7B8F77",
+  "其他":   "#C4B8A4",
+  "未標記": "#DDD6C6",
+};
+
+function ContentDistChartSection({ pages, posts, allMonths }) {
+  const [distMonth, setDistMonth] = useState(allMonths[allMonths.length - 1] || "");
+  const svgRef = useRef(null);
+
+  useEffect(() => {
+    if (!distMonth && allMonths.length) setDistMonth(allMonths[allMonths.length - 1]);
+  }, [allMonths, distMonth]);
+
+  const distData = useMemo(() => {
+    const monthPosts = posts.filter((p) => p.month === distMonth);
+    return pages.map((page) => {
+      const pagePosts = monthPosts.filter((p) => p.pageId === page.id);
+      if (pagePosts.length === 0) return null;
+      const tagCounts = {};
+      POST_CONTENT_TAGS.forEach((t) => { tagCounts[t] = 0; });
+      let untagged = 0;
+      pagePosts.forEach((p) => {
+        const tags = p.tags || [];
+        if (tags.length === 0) untagged++;
+        else tags.forEach((t) => { if (tagCounts[t] != null) tagCounts[t]++; });
+      });
+      return { page, total: pagePosts.length, tagCounts, untagged };
+    }).filter(Boolean).sort((a, b) => b.total - a.total);
+  }, [pages, posts, distMonth]);
+
+  const allTags = [...POST_CONTENT_TAGS, "未標記"];
+  const leftMargin = 210;
+  const rightMargin = 60;
+  const rowH = 36;
+  const width = 820;
+  const barAreaW = width - leftMargin - rightMargin;
+  const maxTotal = Math.max(...distData.map((r) => r.total), 1);
+  const svgH = distData.length * rowH + 40;
+
+  const title = `貼文內容分佈（${distMonth ? monthLabel(distMonth) : "—"}，依粉絲團）`;
+
+  return (
+    <>
+      <SectionTitle icon="chart" title="貼文內容分佈（單月，依粉絲團）" />
+      <div style={styles.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 13, color: "#7A7568" }}>月份：</span>
+            <select style={{ ...styles.input, width: "auto" }} value={distMonth} onChange={(e) => setDistMonth(e.target.value)}>
+              {allMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+          </div>
+          <button style={styles.secondaryBtn} onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, `貼文內容分佈_${distMonth}.png`, title)} disabled={distData.length === 0}>
+            <Icon name="download" size={15} /> 下載圖表
+          </button>
+        </div>
+
+        {/* Legend */}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+          {allTags.map((tag) => (
+            <div key={tag} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#5C5847" }}>
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: TAG_COLORS[tag], display: "inline-block", flexShrink: 0 }} />
+              {tag}
+            </div>
+          ))}
+        </div>
+
+        {distData.length === 0 ? (
+          <EmptyState text="這個月份尚無貼文紀錄。" />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <svg ref={svgRef} width={width} height={svgH} style={{ display: "block", background: "#FBF9F4" }}>
+              {/* X-axis ticks */}
+              {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
+                const x = leftMargin + pct * barAreaW;
+                const val = Math.round(pct * maxTotal);
+                return (
+                  <g key={pct}>
+                    <line x1={x} x2={x} y1={0} y2={svgH - 20} stroke="#E6E1D6" strokeWidth={1} />
+                    <text x={x} y={svgH - 6} textAnchor="middle" fontSize={10} fill="#A6A096">{val}</text>
+                  </g>
+                );
+              })}
+              {distData.map((r, i) => {
+                const y = 10 + i * rowH;
+                let xCursor = leftMargin;
+                const segments = allTags.map((tag) => {
+                  const count = tag === "未標記" ? r.untagged : (r.tagCounts[tag] || 0);
+                  const w = (count / maxTotal) * barAreaW;
+                  return { tag, count, w };
+                }).filter((s) => s.count > 0);
+
+                return (
+                  <g key={r.page.id}>
+                    <text x={leftMargin - 10} y={y + rowH / 2 + 4} textAnchor="end" fontSize={12} fill="#3A3A38">
+                      {r.page.name.length > 16 ? r.page.name.slice(0, 16) + "…" : r.page.name}
+                    </text>
+                    {segments.map((s) => {
+                      const rx = xCursor;
+                      xCursor += s.w;
+                      return (
+                        <g key={s.tag}>
+                          <rect x={rx} y={y + 6} width={Math.max(s.w, 1)} height={rowH - 14} fill={TAG_COLORS[s.tag]} />
+                          {s.w > 22 && (
+                            <text x={rx + s.w / 2} y={y + rowH / 2 + 4} textAnchor="middle" fontSize={10} fill="#fff" fontWeight={600}>{s.count}</text>
+                          )}
+                        </g>
+                      );
+                    })}
+                    <text x={xCursor + 6} y={y + rowH / 2 + 4} fontSize={11} fill="#7A7568" fontFamily="'Space Grotesk', sans-serif">
+                      {r.total}篇
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 
