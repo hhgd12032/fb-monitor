@@ -2037,6 +2037,7 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
         最舊量測日期: r.firstDate ?? "",
         增減人數: r.diff != null ? r.diff : "僅一筆",
         增減百分比: r.pct != null ? `${r.pct.toFixed(2)}%` : "",
+        本月發文篇數: monthPosts.filter((p) => p.pageId === r.page.id).length || 0,
       });
 
       // Helper: post row
@@ -2165,12 +2166,14 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
                 <th style={{ ...styles.th, textAlign: "right" }}>區間</th>
                 <th style={{ ...styles.th, textAlign: "right" }}>增減人數</th>
                 <th style={{ ...styles.th, textAlign: "right" }}>增減率</th>
+                <th style={{ ...styles.th, textAlign: "right" }}>本月發文</th>
               </tr>
             </thead>
             <tbody>
               {fanGrowthFiltered.map((r, i) => {
                 const groupColors = { A: "#3D6A63", B: "#8A5E3C", C: "#5E4A7A" };
                 const groupBgs = { A: "#DDE5E2", B: "#EDE4D6", C: "#E2DDE8" };
+                const postCount = monthPosts.filter((p) => p.pageId === r.page.id).length;
                 return (
                   <tr key={r.page.id} style={styles.tr}>
                     <td style={styles.td}>{i === 0 ? <Icon name="crown" size={15} /> : i + 1}</td>
@@ -2193,6 +2196,9 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
                     </td>
                     <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.pct == null ? "#A6A096" : r.pct >= 0 ? "#7B8F77" : "#C08081" }}>
                       {r.pct == null ? "—" : `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%`}
+                    </td>
+                    <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: postCount > 0 ? "#3A3A38" : "#D0CAC0" }}>
+                      {postCount > 0 ? postCount : "—"}
                     </td>
                   </tr>
                 );
