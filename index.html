@@ -333,7 +333,7 @@ function App() {
         )}
         {view === "report" && (
           <ReportView
-            pages={visiblePages}
+            pages={pages}
             posts={posts}
             fanRecords={fanRecords}
             groupRecords={groupRecords}
@@ -343,7 +343,7 @@ function App() {
           />
         )}
         {view === "trend" && (
-          <TrendView pages={visiblePages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords} />
+          <TrendView pages={pages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords} />
         )}
         {view === "settings" && (
           <SettingsView
@@ -1119,7 +1119,13 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
                       ) : (
                         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                           {isHidden && <span style={{ fontSize: 10, background: "#DDD6C6", color: "#7A7568", padding: "1px 6px", borderRadius: 4, fontWeight: 600, flexShrink: 0 }}>隱藏中</span>}
-                          {p.url ? <a href={p.url} target="_blank" rel="noreferrer" style={{ ...styles.link, color: "#3A3A38", fontWeight: 500, textDecoration: "none" }}>{p.name}</a> : <span style={{ fontWeight: 500 }}>{p.name}</span>}
+                          <span style={{ fontWeight: 500 }}>{p.name}</span>
+                          {p.url && (
+                            <a href={p.url} target="_blank" rel="noreferrer" title={p.url}
+                              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: 7, background: "#EBE6D9", color: "#8A9A8E", flexShrink: 0, textDecoration: "none" }}>
+                              <Icon name="link" size={13} />
+                            </a>
+                          )}
                         </div>
                       )}
                     </td>
@@ -1563,6 +1569,12 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
           <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
             <div style={styles.cardHeadRow}>
               <span>{selectedPage?.name || "—"} · {monthLabel(month)} 已輸入 {monthPosts.length} 篇</span>
+              {selectedPage?.url && (
+                <a href={selectedPage.url} target="_blank" rel="noreferrer" title={`開啟 ${selectedPage.name} 粉絲團頁面`}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, background: "#EBE6D9", color: "#8A9A8E", textDecoration: "none", fontSize: 12.5, fontWeight: 500 }}>
+                  <Icon name="link" size={13} /> 開啟粉絲團
+                </a>
+              )}
             </div>
             {monthPosts.length === 0 ? (
               <EmptyState text="這個粉絲團本月還沒有輸入任何貼文。" />
@@ -1715,7 +1727,15 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
           </div>
 
           <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
-            <div style={styles.cardHeadRow}>{fanPage?.name || "—"} · {monthLabel(month)} 粉絲數紀錄</div>
+            <div style={styles.cardHeadRow}>
+              <span>{fanPage?.name || "—"} · {monthLabel(month)} 粉絲數紀錄</span>
+              {fanPage?.url && (
+                <a href={fanPage.url} target="_blank" rel="noreferrer" title={`開啟 ${fanPage.name} 粉絲團頁面`}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, background: "#EBE6D9", color: "#8A9A8E", textDecoration: "none", fontSize: 12.5, fontWeight: 500 }}>
+                  <Icon name="link" size={13} /> 開啟粉絲團
+                </a>
+              )}
+            </div>
             {fanEntriesThisMonth.length === 0 ? (
               <EmptyState text="這個粉絲團本月還沒有粉絲人數紀錄。" />
             ) : (
@@ -3621,7 +3641,7 @@ const styles = {
   subtitle: { fontSize: 13.5, color: "#8C8674", marginTop: 4 },
 
   card: { background: "#FBF9F4", border: "1px solid #E6E1D6", borderRadius: 14, padding: 22 },
-  cardHeadRow: { padding: "13px 22px", borderBottom: "1px solid #E6E1D6", fontSize: 13.5, color: "#7A7568", fontWeight: 500 },
+  cardHeadRow: { padding: "13px 22px", borderBottom: "1px solid #E6E1D6", fontSize: 13.5, color: "#7A7568", fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 },
 
   formGrid: {
     display: "grid",
