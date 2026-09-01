@@ -201,7 +201,20 @@ async function fbGet(docId, fallback) {
     const ref = window.__fbdoc(db, FB_COLLECTION, docId);
     const snap = await window.__fbgetDoc(ref);
     if (snap.exists()) {
-      return snap.data().value ?? fallback;
+      let val = snap.data().value ?? fallback;
+      // Backfill seq for posts that don't have one, preserving the array order from Firestore
+      if (docId === "posts" && Array.isArray(val)) {
+        let needsWrite = false;
+        val = val.map((p, i) => {
+          if (p.seq == null) { needsWrite = true; return { ...p, seq: i }; }
+          return p;
+        });
+        if (needsWrite) {
+          // Write back with seq filled in (fire-and-forget)
+          window.__fbsetDoc(window.__fbdoc(db, "fb_monitor", docId), { value: val }).catch(() => {});
+        }
+      }
+      return val;
     }
     return fallback;
   } catch (e) {
@@ -1200,7 +1213,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
   }, [month]);
 
   const monthPosts = useMemo(
-    () => { const arr = posts.map((p, i) => ({ ...p, _idx: i })).filter((p) => p.month === month && p.pageId === selectedPageId); return arr.sort((a, b) => (b.date || "").localeCompare(a.date || "") || a._idx - b._idx); },
+    () => posts.filter((p) => p.month === month && p.pageId === selectedPageId).slice().sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.seq ?? 0) - (a.seq ?? 0)),
     [posts, month, selectedPageId]
   );
 
@@ -1229,6 +1242,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
       star: !!draft.star,
       tags: draft.tags || [],
       createdAt: Date.now(),
+      seq: posts.length,
       date: draft.date || `${month}-01`,
       month,
     };
@@ -1902,7 +1916,7 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
     return pages
       .map((p) => {
         const entries = entriesInMonth(fanRecords, p.id, month)
-          .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (posts.indexOf(a) - posts.indexOf(b)));
+          .sort((a, b) => (a.date || "").localeCompare(b.date || "") || ((a.seq ?? 0) - (b.seq ?? 0)));
         if (entries.length === 0) return null;
         const first = entries[0];
         const last = entries[entries.length - 1];
@@ -2005,7 +2019,7 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
     lines.push("");
 
     targetPages.forEach((page) => {
-      const pagePosts = relevantPosts.filter((p) => p.pageId === page.id).sort((a, b) => (a.date || "").localeCompare(b.date || "") || (posts.indexOf(a) - posts.indexOf(b)));
+      const pagePosts = relevantPosts.filter((p) => p.pageId === page.id).sort((a, b) => (a.date || "").localeCompare(b.date || "") || ((a.seq ?? 0) - (b.seq ?? 0)));
       if (pagePosts.length === 0) return;
       lines.push(`【${page.name}】（共 ${pagePosts.length} 篇）`);
       pagePosts.forEach((p, i) => {
@@ -2877,7 +2891,7 @@ function TrendView({ pages, fanRecords, posts, groupRecords }) {
           const m = (e.date || "").slice(0, 7);
           return m >= rangeStart && m <= rangeEnd;
         })
-        .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (posts.indexOf(a) - posts.indexOf(b)));
+        .sort((a, b) => (a.date || "").localeCompare(b.date || "") || ((a.seq ?? 0) - (b.seq ?? 0)));
       if (allEntries.length < 1) return null;
       const oldest = allEntries[0].count;
       const newest = allEntries[allEntries.length - 1].count;
@@ -3266,7 +3280,7 @@ function PostDetailChartSection({ pages, posts, allMonths }) {
   const detailPosts = useMemo(() => {
     return posts
       .filter((p) => p.pageId === detailPageId && p.month === detailMonth)
-      .sort((a, b) => (a.date || "").localeCompare(b.date || "") || (posts.indexOf(a) - posts.indexOf(b)));
+      .sort((a, b) => (a.date || "").localeCompare(b.date || "") || ((a.seq ?? 0) - (b.seq ?? 0)));
   }, [posts, detailPageId, detailMonth]);
 
   const detailPage = pages.find((p) => p.id === detailPageId);
