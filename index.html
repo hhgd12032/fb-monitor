@@ -71,6 +71,7 @@ const POST_TYPES = [
 const POST_SOURCES = [
   { value: "original", label: "自製" },
   { value: "repost", label: "轉發" },
+  { value: "ai", label: "AI" },
 ];
 
 const POST_FORMATS = [
@@ -1838,11 +1839,12 @@ function SourceTag({ source }) {
   const s = POST_SOURCES.find((x) => x.value === source);
   if (!s) return <span style={{ color: "#A6A096", fontSize: 12 }}>—</span>;
   const isRepost = source === "repost";
+  const isAI = source === "ai";
   return (
     <span style={{
       ...styles.typeTag,
-      background: isRepost ? "#EDE4D6" : "#DDE5E2",
-      color: isRepost ? "#8A5E3C" : "#3D6A63",
+      background: isAI ? "#E2DDE8" : isRepost ? "#EDE4D6" : "#DDE5E2",
+      color: isAI ? "#5A4070" : isRepost ? "#8A5E3C" : "#3D6A63",
     }}>
       {s.label}
     </span>
@@ -1960,12 +1962,15 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
       const pagePosts = monthPosts.filter((post) => post.pageId === p.id);
       const tagCounts = {};
       POST_CONTENT_TAGS.forEach((t) => { tagCounts[t] = 0; });
+      const sourceCounts = { original: 0, repost: 0, ai: 0 };
       let untagged = 0;
       pagePosts.forEach((post) => {
         const tags = post.tags || [];
         if (tags.length === 0) { untagged++; } else { tags.forEach((t) => { if (tagCounts[t] != null) tagCounts[t]++; }); }
+        const src = post.source || "original";
+        if (sourceCounts[src] != null) sourceCounts[src]++; else sourceCounts.original++;
       });
-      return { page: p, total: pagePosts.length, tagCounts, untagged, group: getGroup(p.id) };
+      return { page: p, total: pagePosts.length, tagCounts, untagged, sourceCounts, group: getGroup(p.id) };
     }).filter((r) => r.total > 0);
   }, [pages, monthPosts, monthGroups]);
 
@@ -2272,17 +2277,21 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
                   <tr>
                     <th style={styles.th}>粉絲團</th>
                     {hasGroupData && <th style={{ ...styles.th, textAlign: "center", width: 56 }}>組別</th>}
-                    <th style={{ ...styles.th, textAlign: "right", width: 64 }}>總篇數</th>
-                    {POST_CONTENT_TAGS.map((tag) => (
-                      <th key={tag} style={{ ...styles.th, textAlign: "right", width: 64 }}>{tag}</th>
+                    <th style={{ ...styles.th, textAlign: "right", width: 60 }}>總篇數</th>
+                    <th style={{ ...styles.th, textAlign: "right", width: 54, borderLeft: "2px solid #E6E1D6" }}>自製</th>
+                    <th style={{ ...styles.th, textAlign: "right", width: 54 }}>轉發</th>
+                    <th style={{ ...styles.th, textAlign: "right", width: 54 }}>AI</th>
+                    {POST_CONTENT_TAGS.map((tag, i) => (
+                      <th key={tag} style={{ ...styles.th, textAlign: "right", width: 60, ...(i === 0 ? { borderLeft: "2px solid #E6E1D6" } : {}) }}>{tag}</th>
                     ))}
-                    <th style={{ ...styles.th, textAlign: "right", width: 64 }}>未標記</th>
+                    <th style={{ ...styles.th, textAlign: "right", width: 60 }}>未標記</th>
                   </tr>
                 </thead>
                 <tbody>
                   {contentDist.map((r) => {
                     const groupColors = { A: "#3D6A63", B: "#8A5E3C", C: "#5E4A7A" };
                     const groupBgs = { A: "#DDE5E2", B: "#EDE4D6", C: "#E2DDE8" };
+                    const sc = r.sourceCounts || {};
                     return (
                       <tr key={r.page.id} style={styles.tr}>
                         <td style={styles.td}><PageNameCell page={r.page} /></td>
@@ -2294,8 +2303,15 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
                           </td>
                         )}
                         <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600 }}>{r.total}</td>
-                        {POST_CONTENT_TAGS.map((tag) => (
-                          <td key={tag} style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.tagCounts[tag] > 0 ? "#3A3A38" : "#D0CAC0" }}>
+                        {/* Source columns */}
+                        {[["original", "#3D6A63"], ["repost", "#8A5E3C"], ["ai", "#5A4070"]].map(([src, color], i) => (
+                          <td key={src} style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: (sc[src] || 0) > 0 ? color : "#D0CAC0", ...(i === 0 ? { borderLeft: "2px solid #F0EBE1" } : {}) }}>
+                            {(sc[src] || 0) > 0 ? sc[src] : "—"}
+                          </td>
+                        ))}
+                        {/* Content tag columns */}
+                        {POST_CONTENT_TAGS.map((tag, i) => (
+                          <td key={tag} style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: r.tagCounts[tag] > 0 ? "#3A3A38" : "#D0CAC0", ...(i === 0 ? { borderLeft: "2px solid #F0EBE1" } : {}) }}>
                             {r.tagCounts[tag] > 0 ? r.tagCounts[tag] : "—"}
                           </td>
                         ))}
@@ -2306,7 +2322,7 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
                     );
                   })}
                   {contentDist.length === 0 && (
-                    <tr><td colSpan={POST_CONTENT_TAGS.length + (hasGroupData ? 4 : 3)} style={{ ...styles.td, color: "#A6A096", textAlign: "center", padding: 20 }}>本月尚無貼文紀錄</td></tr>
+                    <tr><td colSpan={POST_CONTENT_TAGS.length + (hasGroupData ? 7 : 6)} style={{ ...styles.td, color: "#A6A096", textAlign: "center", padding: 20 }}>本月尚無貼文紀錄</td></tr>
                   )}
                 </tbody>
               </table>
@@ -3118,6 +3134,7 @@ function TrendView({ pages, fanRecords, posts, groupRecords }) {
             unit="互動數"
           />
 
+          <SourceTypeChartSection pages={pages} posts={posts} allMonths={allMonths} />
           <ContentDistChartSection pages={pages} posts={posts} allMonths={allMonths} />
           <PostDetailChartSection pages={pages} posts={posts} allMonths={allMonths} />
         </>
@@ -3127,6 +3144,118 @@ function TrendView({ pages, fanRecords, posts, groupRecords }) {
 }
 
 /* ---------------- Content distribution stacked bar chart (per page, per month) ---------------- */
+const SOURCE_COLORS = {
+  "自製": "#7B8F77",
+  "轉發": "#B08968",
+  "AI":   "#9A8AA6",
+};
+
+function SourceTypeChartSection({ pages, posts, allMonths }) {
+  const [distMonth, setDistMonth] = useState(allMonths[allMonths.length - 1] || "");
+  const svgRef = useRef(null);
+
+  useEffect(() => {
+    if (!distMonth && allMonths.length) setDistMonth(allMonths[allMonths.length - 1]);
+  }, [allMonths, distMonth]);
+
+  const distData = useMemo(() => {
+    const monthPosts = posts.filter((p) => p.month === distMonth);
+    return pages.map((page) => {
+      const pagePosts = monthPosts.filter((p) => p.pageId === page.id);
+      if (pagePosts.length === 0) return null;
+      const counts = { "自製": 0, "轉發": 0, "AI": 0 };
+      pagePosts.forEach((p) => {
+        const src = p.source || "original";
+        if (src === "original") counts["自製"]++;
+        else if (src === "repost") counts["轉發"]++;
+        else if (src === "ai") counts["AI"]++;
+        else counts["自製"]++;
+      });
+      return { page, total: pagePosts.length, counts };
+    }).filter(Boolean).sort((a, b) => b.total - a.total);
+  }, [pages, posts, distMonth]);
+
+  const sources = ["自製", "轉發", "AI"];
+  const leftMargin = 210;
+  const rightMargin = 60;
+  const rowH = 36;
+  const width = 820;
+  const barAreaW = width - leftMargin - rightMargin;
+  const maxTotal = Math.max(...distData.map((r) => r.total), 1);
+  const svgH = distData.length * rowH + 40;
+  const title = `貼文類型分佈（${distMonth ? monthLabel(distMonth) : "—"}，自製／轉發／AI）`;
+
+  return (
+    <>
+      <SectionTitle icon="users" title="貼文類型分佈（自製／轉發／AI）" />
+      <div style={styles.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 13, color: "#7A7568" }}>月份：</span>
+            <select style={{ ...styles.input, width: "auto" }} value={distMonth} onChange={(e) => setDistMonth(e.target.value)}>
+              {allMonths.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+          </div>
+          <button style={styles.secondaryBtn} onClick={() => svgRef.current && downloadSvgAsPng(svgRef.current, `貼文類型分佈_${distMonth}.png`, title)} disabled={distData.length === 0}>
+            <Icon name="download" size={15} /> 下載圖表
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+          {sources.map((s) => (
+            <div key={s} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#5C5847" }}>
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: SOURCE_COLORS[s], display: "inline-block", flexShrink: 0 }} />
+              {s}
+            </div>
+          ))}
+        </div>
+        {distData.length === 0 ? (
+          <EmptyState text="這個月份尚無貼文紀錄。" />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <svg ref={svgRef} width={width} height={svgH} style={{ display: "block", background: "#FBF9F4" }}>
+              {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
+                const x = leftMargin + pct * barAreaW;
+                const val = Math.round(pct * maxTotal);
+                return (
+                  <g key={pct}>
+                    <line x1={x} x2={x} y1={0} y2={svgH - 20} stroke="#E6E1D6" strokeWidth={1} />
+                    <text x={x} y={svgH - 6} textAnchor="middle" fontSize={10} fill="#A6A096">{val}</text>
+                  </g>
+                );
+              })}
+              {distData.map((r, i) => {
+                const y = 10 + i * rowH;
+                let xCursor = leftMargin;
+                const segments = sources.map((s) => ({ s, count: r.counts[s] || 0, w: ((r.counts[s] || 0) / maxTotal) * barAreaW })).filter((seg) => seg.count > 0);
+                return (
+                  <g key={r.page.id}>
+                    <text x={leftMargin - 10} y={y + rowH / 2 + 4} textAnchor="end" fontSize={12} fill="#3A3A38">
+                      {r.page.name.length > 16 ? r.page.name.slice(0, 16) + "…" : r.page.name}
+                    </text>
+                    {segments.map((seg) => {
+                      const rx = xCursor;
+                      xCursor += seg.w;
+                      return (
+                        <g key={seg.s}>
+                          <rect x={rx} y={y + 6} width={Math.max(seg.w, 1)} height={rowH - 14} fill={SOURCE_COLORS[seg.s]} />
+                          {seg.w > 22 && (
+                            <text x={rx + seg.w / 2} y={y + rowH / 2 + 4} textAnchor="middle" fontSize={10} fill="#fff" fontWeight={600}>{seg.count}</text>
+                          )}
+                        </g>
+                      );
+                    })}
+                    <text x={xCursor + 6} y={y + rowH / 2 + 4} fontSize={11} fill="#7A7568" fontFamily="'Space Grotesk', sans-serif">{r.total}篇</text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 const TAG_COLORS = {
   "公告":   "#8A9A8E",
   "促銷":   "#B08968",
