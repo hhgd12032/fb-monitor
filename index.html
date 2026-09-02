@@ -1979,6 +1979,16 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
   const [promptQuery, setPromptQuery] = useState("");
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [copied, setCopied] = useState(false);
+  const [aiResult, setAiResult] = useState("");   // AI 分析結論貼入區
+
+  const downloadHtmlReport = () => {
+    if (!aiResult.trim()) { showToast("請先貼入 AI 分析結論"); return; }
+    const html = buildReportHtml({ pages, posts, fanRecords, groupRecords, month, aiResult });
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `Honda月報_${month}.html`; a.click();
+    showToast("HTML 月報已下載");
+  };
 
   const promptFilteredPages = useMemo(() => {
     const q = promptQuery.trim();
@@ -2101,6 +2111,46 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
     lines.push("");
     lines.push("---");
     lines.push("（互動總計 = 讚＋留言＋分享；粉絲增減為當月最新一筆減最舊一筆）");
+
+    // ── Key observations (auto-detected anomalies) ──
+    const observations = [];
+
+    // Fan growth anomalies: > 100 increase
+    Object.values(groupData).flat().forEach((m) => {
+      if (m.fanDiff != null && m.fanDiff > 100) {
+        observations.push(`⚠️ ${m.name} 粉絲暴增 +${m.fanDiff}（${m.fanFirst}→${m.fanLast}），與內容互動表現是否匹配？建議確認是否有廣告投放或活動導流`);
+      }
+    });
+
+    // Full repost with very low engagement
+    Object.values(groupData).flat().forEach((m) => {
+      const totalPosts = m.pagePosts.length;
+      if (totalPosts >= 3 && m.sources.repost === totalPosts && m.totalEng < 20) {
+        observations.push(`⚠️ ${m.name} 共 ${totalPosts} 篇全為轉發，總互動僅 ${m.totalEng}，幾乎沒有效果`);
+      }
+    });
+
+    // Very few posts
+    Object.values(groupData).flat().forEach((m) => {
+      if (m.pagePosts.length <= 1) {
+        observations.push(`⚠️ ${m.name} 本月僅發文 ${m.pagePosts.length} 篇，發文量過低會限制觸及與互動累積`);
+      }
+    });
+
+    // High announcement ratio + low engagement
+    Object.values(groupData).flat().forEach((m) => {
+      const announcePosts = m.pagePosts.filter((p) => (p.tags || []).includes("公告"));
+      if (m.pagePosts.length >= 4 && announcePosts.length / m.pagePosts.length > 0.5 && m.avgEng < 15) {
+        observations.push(`⚠️ ${m.name} 公告類貼文佔比高（${announcePosts.length}/${m.pagePosts.length} 篇），均互動僅 ${m.avgEng}/篇，建議控制公告佔比並增加創意包裝`);
+      }
+    });
+
+    if (observations.length > 0) {
+      lines.push("【本月重點觀察 — 請特別留意】");
+      observations.forEach((o) => lines.push(`  ${o}`));
+      lines.push("");
+      lines.push("---");
+    }
 
     setGeneratedPrompt(lines.join("\n"));
     setCopied(false);
@@ -2421,10 +2471,257 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
               </div>
             )}
           </div>
+
+          <SectionTitle icon="download" title="貼入 AI 結論 · 下載月報" />
+          <div style={styles.card}>
+            <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0, marginBottom: 14 }}>
+              將 AI 回覆的分析結論文字貼入下方（Markdown 格式即可），系統會與本月數據合併，產出完整月報。
+            </p>
+            <textarea
+              placeholder={"在這裡貼入 AI 回覆的分析結論文字…\n\n例如：\n# 各組整體表現觀察\nA組表現最為紮實…\n\n## 本月表現最突出的3家經銷商\n…"}
+              value={aiResult}
+              onChange={(e) => setAiResult(e.target.value)}
+              style={{ ...styles.promptTextarea, minHeight: 200, color: aiResult ? "#3A3A38" : "#AAA" }}
+            />
+            <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+              <button
+                style={{ ...styles.primaryBtn, opacity: aiResult.trim() ? 1 : 0.5 }}
+                onClick={downloadHtmlReport}
+              >
+                <Icon name="download" size={16} />
+                下載 HTML 月報
+              </button>
+              <button
+                style={{ ...styles.secondaryBtn, opacity: aiResult.trim() ? 1 : 0.5, color: "#7A7568" }}
+                onClick={() => showToast("PPT 匯出功能即將推出")}
+              >
+                <Icon name="trend" size={16} />
+                下載 PPT 月報
+              </button>
+              {aiResult.trim() && (
+                <button style={{ ...styles.secondaryBtn, color: "#C08081" }} onClick={() => setAiResult("")}>
+                  清除
+                </button>
+              )}
+            </div>
+          </div>
         </>
       )}
     </div>
   );
+}
+
+/* ── HTML Report Builder ── */
+function buildReportHtml({ pages, posts, fanRecords, groupRecords, month, aiResult }) {
+  const monthGroups = groupRecords[month] || {};
+  const monthPosts = posts.filter((p) => p.month === month);
+  const pageMap = {};
+  pages.forEach((p) => { pageMap[p.id] = p; });
+
+  const getGroup = (pid) => monthGroups[pid] || "";
+  const eng = (p) => (p.likes || 0) + (p.comments || 0) + (p.shares || 0);
+
+  const groupColors = { A: "#3D6A63", B: "#7A5230", C: "#4E3D6E" };
+  const groupBgs   = { A: "#EBF0EE", B: "#F5EDE3", C: "#EDE9F2" };
+
+  // Per-group stats
+  const groups = { A: [], B: [], C: [] };
+  pages.forEach((page) => {
+    const grp = monthGroups[page.id];
+    if (!grp || !groups[grp]) return;
+    const pp = monthPosts.filter((p) => p.pageId === page.id);
+    const fanEntries = ((fanRecords[page.id] || [])
+      .filter((e) => (e.date || "").startsWith(month))
+      .sort((a, b) => (a.date || "").localeCompare(b.date || "")));
+    const fanFirst = fanEntries[0]?.count;
+    const fanLast  = fanEntries[fanEntries.length - 1]?.count;
+    const fanDiff  = fanEntries.length > 1 ? fanLast - fanFirst : null;
+    const totalEng = pp.reduce((s, p) => s + eng(p), 0);
+    const starCount = pp.filter((p) => p.star).length;
+    const sources = { original: 0, repost: 0, ai: 0 };
+    pp.forEach((p) => { const s = p.source || "original"; if (sources[s] != null) sources[s]++; else sources.original++; });
+    groups[grp].push({ page, pp, totalEng, avgEng: pp.length ? (totalEng / pp.length).toFixed(1) : 0, fanFirst, fanLast, fanDiff, starCount, sources });
+  });
+  ["A","B","C"].forEach((g) => groups[g].sort((a, b) => (b.fanDiff || 0) - (a.fanDiff || 0)));
+
+  const starPosts = monthPosts.filter((p) => p.star);
+  const totalStats = {
+    pages: Object.values(groups).flat().length,
+    posts: monthPosts.length,
+    eng: monthPosts.reduce((s, p) => s + eng(p), 0),
+    stars: starPosts.length,
+  };
+
+  // Parse AI result sections (simple split by ##)
+  const parseAI = (md) => {
+    if (!md.trim()) return {};
+    const sections = {};
+    const lines = md.split("\n");
+    let current = "intro"; let buf = [];
+    lines.forEach((line) => {
+      const h = line.match(/^#{1,3}\s+(.+)/);
+      if (h) { sections[current] = buf.join("\n").trim(); current = h[1]; buf = []; }
+      else buf.push(line);
+    });
+    sections[current] = buf.join("\n").trim();
+    return sections;
+  };
+  const aiSections = parseAI(aiResult);
+  const aiText = (key) => {
+    const match = Object.entries(aiSections).find(([k]) => k.includes(key));
+    return match ? match[1] : "";
+  };
+  const mdToHtml = (md) => md
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/\n{2,}/g, "</p><p>")
+    .replace(/\n- /g, "<br>• ")
+    .replace(/^- /g, "• ");
+
+  const groupTable = (grp) => {
+    const members = groups[grp];
+    if (!members.length) return "";
+    const rows = members.map((m) => `
+      <tr>
+        <td>${m.page.name}</td>
+        <td class="r">${m.pp.length}</td>
+        <td class="r">${m.totalEng.toLocaleString()}</td>
+        <td class="r" style="color:${Number(m.avgEng) >= 50 ? "#2E6B50" : "#555"}">${m.avgEng}</td>
+        <td class="r" style="color:${m.fanDiff == null ? "#AAA" : m.fanDiff > 0 ? "#2E6B50" : m.fanDiff < 0 ? "#B03030" : "#555"}">
+          ${m.fanDiff == null ? (m.fanLast ?? "—") : (m.fanDiff > 0 ? "+" : "") + m.fanDiff}
+        </td>
+        <td class="r">${m.starCount > 0 ? "⭐ " + m.starCount : "—"}</td>
+      </tr>`).join("");
+    return `<table class="tbl">
+      <thead><tr><th>${grp} 組</th><th class="r">篇數</th><th class="r">互動</th><th class="r">均互動</th><th class="r">粉絲增減</th><th class="r">點子王</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  };
+
+  const starCards = starPosts.map((p) => {
+    const grp = getGroup(p.pageId);
+    const name = pageMap[p.pageId]?.name || "";
+    return `<div class="star-card">
+      <div class="who"><span class="grp-badge" style="background:${groupBgs[grp]};color:${groupColors[grp]}">${grp} 組</span>${name} · ${p.date}</div>
+      <div class="metrics"><span>${p.likes || 0} <small>讚</small></span><span>${p.comments || 0} <small>留言</small></span><span>${p.shares || 0} <small>分享</small></span><strong>${eng(p)} <small>互動</small></strong></div>
+      ${(p.tags || []).map((t) => `<span class="tag-chip">${t}</span>`).join("")}
+      ${p.url ? `<a class="link-btn" href="${p.url}" target="_blank">→ 查看貼文</a>` : ""}
+    </div>`;
+  }).join("");
+
+  const ml = (m) => { const [y, mo] = m.split("-"); return `${y}年${parseInt(mo)}月`; };
+
+  return `<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Honda 粉絲團月報 ${ml(month)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&family=Noto+Sans+TC:wght@400;500;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans TC',sans-serif;background:#F5F4F1;color:#1E1E1C;font-size:14px;line-height:1.6;}
+a{color:inherit;text-decoration:none;}
+.report{max-width:960px;margin:0 auto;padding:48px 32px 80px;}
+.cover{background:#1E1E1C;color:#F5F4F1;border-radius:20px;padding:56px 56px 48px;margin-bottom:48px;position:relative;overflow:hidden;}
+.cover::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 60px,rgba(255,255,255,.025) 60px,rgba(255,255,255,.025) 61px);}
+.cover-label{font-size:11px;letter-spacing:3px;color:#888;margin-bottom:16px;font-family:'Space Grotesk',sans-serif;}
+.cover h1{font-family:'Noto Serif TC',serif;font-size:36px;line-height:1.2;margin-bottom:8px;}
+.cover-sub{font-size:15px;color:#AAA;margin-bottom:32px;}
+.cover-stats{display:flex;gap:40px;flex-wrap:wrap;}
+.cover-stat .n{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:600;}
+.cover-stat .l{font-size:11px;color:#888;margin-top:2px;}
+.section{margin-bottom:48px;}
+.sh{display:flex;align-items:baseline;gap:12px;margin-bottom:20px;}
+.sh h2{font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;}
+.sh small{font-size:12px;color:#999;}
+.group-block{background:#fff;border-radius:16px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.group-header{padding:14px 20px;display:flex;align-items:center;gap:10px;}
+.grp-badge{padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;}
+.group-badge-lg{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;}
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{padding:9px 16px;text-align:left;font-size:11px;color:#888;font-weight:500;border-bottom:1px solid #F0EDE8;white-space:nowrap;}
+.tbl th.r,.tbl td.r{text-align:right;}
+.tbl td{padding:9px 16px;border-bottom:1px solid #F7F5F2;font-size:13px;font-family:'Space Grotesk',sans-serif;}
+.tbl tr:last-child td{border-bottom:none;}
+hr{border:none;border-top:1px solid #E8E5E0;margin:40px 0;}
+.star-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.star-card{background:#fff;border-radius:12px;padding:16px;border:1px solid #EDE9E4;}
+.star-card .who{font-size:11px;color:#888;margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.star-card .metrics{display:flex;gap:12px;font-family:'Space Grotesk',sans-serif;font-size:13px;margin-bottom:8px;}
+.star-card .metrics small{font-size:10px;color:#AAA;display:block;}
+.tag-chip{display:inline-block;padding:2px 7px;border-radius:5px;font-size:11px;background:#F0EDE8;color:#555;margin:2px;}
+.link-btn{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#3D6A63;background:#EBF0EE;padding:4px 10px;border-radius:6px;margin-top:8px;}
+.ai-section{background:#fff;border-radius:14px;padding:22px 24px;border:1px solid #E8E5E0;margin-bottom:16px;}
+.ai-section h3{font-family:'Noto Serif TC',serif;font-size:16px;font-weight:700;margin-bottom:10px;}
+.ai-section p{font-size:13px;color:#444;line-height:1.8;}
+.obs-box{background:#FFF8EC;border-radius:12px;padding:18px 20px;border:1px solid #E8D8A0;font-size:13px;color:#7A6020;line-height:1.8;}
+.obs-box strong{color:#5A4000;}
+.three-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.action-card{background:#1E1E1C;border-radius:14px;padding:22px;color:#F5F4F1;}
+.action-num{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:600;margin-bottom:8px;}
+.action-card h4{font-size:13px;font-weight:700;margin-bottom:8px;}
+.action-card p{font-size:12px;color:#AAA;line-height:1.7;}
+</style></head><body>
+<div class="report">
+
+<div class="cover">
+  <div class="cover-label">HONDA TAIWAN · 粉絲團競賽月報</div>
+  <h1>${ml(month)}<br/>粉絲團月報</h1>
+  <div class="cover-sub">A / B / C 三組競賽成果 · 貼文表現分析 · 點子王清單</div>
+  <div class="cover-stats">
+    <div class="cover-stat"><div class="n">${totalStats.pages}</div><div class="l">參賽經銷商</div></div>
+    <div class="cover-stat"><div class="n">${totalStats.posts}</div><div class="l">本月貼文</div></div>
+    <div class="cover-stat"><div class="n">${totalStats.eng.toLocaleString()}</div><div class="l">貼文互動總計</div></div>
+    <div class="cover-stat"><div class="n">${totalStats.stars}</div><div class="l">點子王貼文</div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sh"><h2>粉絲數成長排名</h2><small>當月最新 − 最舊，增減數排名</small></div>
+  ${["A","B","C"].map((g) => `
+  <div class="group-block">
+    <div class="group-header" style="background:${groupBgs[g]}">
+      <div class="group-badge-lg" style="background:${groupColors[g]};color:#fff">${g}</div>
+      <div><strong>${g} 組</strong> <span style="font-size:12px;color:#888;">共 ${groups[g].length} 家</span></div>
+    </div>
+    ${groupTable(g)}
+  </div>`).join("")}
+</div>
+
+<hr/>
+
+<div class="section">
+  <div class="sh"><h2>⭐ 點子王貼文清單</h2><small>${ml(month)} 共 ${totalStats.stars} 篇</small></div>
+  <div class="star-grid">${starCards}</div>
+</div>
+
+${aiResult.trim() ? `
+<hr/>
+<div class="section">
+  <div class="sh"><h2>各組整體表現觀察</h2></div>
+  <div class="ai-section"><p>${mdToHtml(aiText("整體") || aiText("表現") || aiText("觀察") || Object.values(aiSections)[1] || "")}</p></div>
+</div>
+
+<hr/>
+<div class="section">
+  <div class="sh"><h2>本月亮點經銷商</h2></div>
+  <div class="ai-section"><p>${mdToHtml(aiText("突出") || aiText("亮點") || aiText("經銷商") || "")}</p></div>
+</div>
+
+<hr/>
+<div class="section">
+  <div class="sh"><h2>貼文策略觀察</h2></div>
+  <div class="ai-section"><p>${mdToHtml(aiText("策略") || aiText("貼文") || "")}</p></div>
+  ${(aiText("廣告") || aiText("警示") || aiText("背離")) ? `<div class="obs-box" style="margin-top:14px;"><strong>⚠️ 需留意</strong><br>${mdToHtml(aiText("廣告") || aiText("警示") || aiText("背離"))}</div>` : ""}
+</div>
+
+<hr/>
+<div class="section">
+  <div class="sh"><h2>下個月建議行動</h2></div>
+  <div class="ai-section"><p>${mdToHtml(aiText("建議") || aiText("行動") || aiText("下個月") || "")}</p></div>
+</div>
+` : ""}
+
+</div></body></html>`;
 }
 
 function PageNameCell({ page }) {
