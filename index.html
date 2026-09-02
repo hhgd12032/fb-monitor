@@ -1980,6 +1980,19 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
   const [generatedPrompt, setGeneratedPrompt] = useState("");
   const [copied, setCopied] = useState(false);
   const [aiResult, setAiResult] = useState("");   // AI 分析結論貼入區
+  const mdUploadRef = useRef(null);
+
+  const handleMdUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setAiResult(ev.target.result);
+      showToast(`已載入「${file.name}」`);
+    };
+    reader.readAsText(file, "utf-8");
+    e.target.value = ""; // reset so same file can be re-uploaded
+  };
 
   const downloadHtmlReport = () => {
     if (!aiResult.trim()) { showToast("請先貼入 AI 分析結論"); return; }
@@ -2474,9 +2487,16 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
 
           <SectionTitle icon="download" title="貼入 AI 結論 · 下載月報" />
           <div style={styles.card}>
-            <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0, marginBottom: 14 }}>
-              將 AI 回覆的分析結論文字貼入下方（Markdown 格式即可），系統會與本月數據合併，產出完整月報。
-            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, margin: 0 }}>
+                將 AI 回覆的分析結論貼入下方，或直接上傳 .md 檔案，系統會與本月數據合併產出完整月報。
+              </p>
+              <button style={{ ...styles.secondaryBtn, flexShrink: 0, marginLeft: 16 }} onClick={() => mdUploadRef.current?.click()}>
+                <Icon name="trend" size={15} />
+                上傳 .md 檔案
+              </button>
+              <input ref={mdUploadRef} type="file" accept=".md,.txt" style={{ display: "none" }} onChange={handleMdUpload} />
+            </div>
             <textarea
               placeholder={"在這裡貼入 AI 回覆的分析結論文字…\n\n例如：\n# 各組整體表現觀察\nA組表現最為紮實…\n\n## 本月表現最突出的3家經銷商\n…"}
               value={aiResult}
