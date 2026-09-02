@@ -1991,54 +1991,116 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
   };
 
   const buildPrompt = () => {
-    const targetPages = promptPageIds.length > 0 ? pages.filter((p) => promptPageIds.includes(p.id)) : pages;
-    const targetIds = new Set(targetPages.map((p) => p.id));
-    const relevantPosts = monthPosts.filter((p) => targetIds.has(p.pageId));
+    const lines = [];
+    const monthGroups = groupRecords[month] || {};
 
-    if (relevantPosts.length === 0) {
-      showToast("所選範圍內這個月沒有貼文資料，無法產生分析提示詞");
+    // Build group-organized data
+    const groupData = { A: [], B: [], C: [] };
+    pages.forEach((page) => {
+      const grp = monthGroups[page.id];
+      if (!grp || !groupData[grp]) return;
+      const pagePosts = monthPosts.filter((p) => p.pageId === page.id);
+      if (pagePosts.length === 0 && !fanRecords[page.id]?.some((e) => (e.date || "").startsWith(month))) return;
+
+      const totalEng = pagePosts.reduce((s, p) => s + engagement(p), 0);
+      const avgEng = pagePosts.length ? (totalEng / pagePosts.length).toFixed(1) : 0;
+      const starPosts = pagePosts.filter((p) => p.star);
+      const sources = { original: 0, repost: 0, ai: 0 };
+      pagePosts.forEach((p) => {
+        const s = p.source || "original";
+        if (sources[s] != null) sources[s]++; else sources.original++;
+      });
+      const tagCounts = {};
+      pagePosts.forEach((p) => (p.tags || []).forEach((t) => { tagCounts[t] = (tagCounts[t] || 0) + 1; }));
+      const topTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t, n]) => `${t}×${n}`).join("、");
+
+      const fanEntries = (fanRecords[page.id] || [])
+        .filter((e) => (e.date || "").startsWith(month))
+        .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+      const fanFirst = fanEntries[0]?.count;
+      const fanLast = fanEntries[fanEntries.length - 1]?.count;
+      const fanDiff = fanEntries.length > 1 ? fanLast - fanFirst : null;
+
+      groupData[grp].push({
+        name: page.name, pagePosts, totalEng, avgEng,
+        starCount: starPosts.length, sources, topTags,
+        fanFirst, fanLast, fanDiff,
+      });
+    });
+
+    const hasGroups = Object.values(groupData).some((g) => g.length > 0);
+
+    if (!hasGroups && monthPosts.length === 0) {
+      showToast("這個月沒有資料，無法產生分析提示詞");
       return;
     }
 
-    const lines = [];
-    lines.push(`你是一位社群媒體經營顧問，請根據以下 ${monthLabel(month)} 的 Facebook 粉絲團貼文數據，分析這個月的貼文表現。`);
+    // ── Header ──
+    lines.push(`你是 Honda Taiwan 的社群媒體分析師。以下是 ${monthLabel(month)} Honda 各經銷商粉絲團的競賽數據，請根據資料提供完整分析報告。`);
     lines.push("");
-    lines.push(`分析對象：${targetPages.map((p) => p.name).join("、")}`);
-    lines.push(`資料範圍：${monthLabel(month)}，共 ${relevantPosts.length} 篇貼文`);
+    lines.push("報告需包含以下四個部分：");
+    lines.push("1. 各組（A/B/C）整體表現觀察（發文量、互動效率、粉絲成長、點子王數量的比較與評語）");
+    lines.push("2. 本月表現最突出的 3 家經銷商，說明其成功關鍵因素");
+    lines.push("3. 貼文策略觀察（創意 vs 促銷 vs 公告的效果差異；自製 vs 轉發的互動落差；是否有疑似廣告投放的異常粉絲成長）");
+    lines.push("4. 下個月針對各類型落後經銷商的具體可執行建議，以及三個全體適用的行動方針");
     lines.push("");
-    lines.push("請特別分析：");
-    lines.push("1. 哪一種貼文類型（靜態貼文／影片／Reels／其他）整體互動率（讚+留言+分享）或觀看數表現最好？");
-    lines.push("2. 表現最好的前幾篇貼文有什麼共同特徵（例如內容主題、發文時間、貼文類型）？推測可能的原因。");
-    lines.push("3. 如果同時有觀看數與互動數資料，請比較「高觀看但低互動」與「高互動」的貼文差異，並說明可能原因。");
-    lines.push("4. 若我有提供貼文連結，請你假設能讀取該連結的網友留言內容，分析留言的情緒傾向（正面/負面/中性）與常見討論主題，並說明這些留言對品牌經營的意義；若無法直接讀取網址內容，請提醒我這點限制。");
-    lines.push("5. 給予下個月內容企劃的具體建議（例如該增加哪種類型的貼文、發文時間或主題方向）。");
+    lines.push("請以繁體中文撰寫，語氣專業，段落分明。");
     lines.push("");
-    lines.push("=== 原始貼文資料 ===");
-    lines.push("（互動總計 = 讚+留言+分享；觀看數僅影片/Reels類型才有，且未計入互動總計，僅供參考）");
+    lines.push("---");
     lines.push("");
 
-    targetPages.forEach((page) => {
-      const pagePosts = relevantPosts.filter((p) => p.pageId === page.id).sort((a, b) => (a.date || "").localeCompare(b.date || "") || ((a.createdAt || 0) - (b.createdAt || 0)));
-      if (pagePosts.length === 0) return;
-      lines.push(`【${page.name}】（共 ${pagePosts.length} 篇）`);
-      pagePosts.forEach((p, i) => {
-        const sourceLabel = POST_SOURCES.find((t) => t.value === p.source)?.label || "";
-        const formatLabel = POST_FORMATS.find((t) => t.value === (p.format || p.type))?.label || (p.format || p.type || "");
-        const parts = [
-          `${i + 1}. 日期:${p.date}`,
-          sourceLabel && `類型:${sourceLabel}`,
-          formatLabel && `形式:${formatLabel}`,
-          `讚:${p.likes}`,
-          `留言:${p.comments}`,
-          `分享:${p.shares}`,
-          `互動總計:${engagement(p)}`,
-        ];
-        if (p.views) parts.push(`觀看數:${p.views}（僅供參考）`);
-        if (p.url) parts.push(`連結:${p.url}`);
-        lines.push("   " + parts.filter(Boolean).join("，"));
+    // ── Group summaries ──
+    ["A", "B", "C"].forEach((grp) => {
+      const members = groupData[grp];
+      if (members.length === 0) return;
+      const totalPosts = members.reduce((s, m) => s + m.pagePosts.length, 0);
+      const totalEng = members.reduce((s, m) => s + m.totalEng, 0);
+      const avgEng = totalPosts ? (totalEng / totalPosts).toFixed(1) : 0;
+      const totalFanDiff = members.reduce((s, m) => s + (m.fanDiff || 0), 0);
+      const totalStars = members.reduce((s, m) => s + m.starCount, 0);
+      lines.push(`【${grp} 組概況】共 ${members.length} 家 | 總發文 ${totalPosts} 篇 | 總互動 ${totalEng.toLocaleString()} | 均互動 ${avgEng}/篇 | 粉絲淨增 +${totalFanDiff} | 點子王 ${totalStars} 篇`);
+      lines.push("");
+      members.sort((a, b) => b.totalEng - a.totalEng).forEach((m) => {
+        const srcParts = [
+          m.sources.original > 0 && `自製×${m.sources.original}`,
+          m.sources.repost > 0 && `轉發×${m.sources.repost}`,
+          m.sources.ai > 0 && `AI×${m.sources.ai}`,
+        ].filter(Boolean).join("、");
+        const fanStr = m.fanDiff != null
+          ? `${m.fanFirst}→${m.fanLast}（+${m.fanDiff}）`
+          : m.fanLast ? `${m.fanLast}（僅一筆）` : "無資料";
+        const starStr = m.starCount > 0 ? `點子王 ${m.starCount} 篇` : "點子王 0 篇";
+        lines.push(`  - ${m.name}：${m.pagePosts.length} 篇，互動 ${m.totalEng}（均 ${m.avgEng}/篇），粉絲 ${fanStr}，${starStr}`);
+        if (srcParts) lines.push(`    來源：${srcParts}${m.topTags ? `　內容：${m.topTags}` : ""}`);
       });
       lines.push("");
     });
+
+    // ── Star posts ──
+    const starPosts = monthPosts.filter((p) => p.star);
+    if (starPosts.length > 0) {
+      lines.push(`【本月點子王貼文 共 ${starPosts.length} 篇】`);
+      starPosts.forEach((p) => {
+        const grp = monthGroups[p.pageId] || "?";
+        const pageName = pages.find((x) => x.id === p.pageId)?.name || "";
+        const tags = (p.tags || []).join("、");
+        const src = POST_SOURCES.find((t) => t.value === p.source)?.label || "";
+        lines.push(`  [${grp}組] ${pageName} ${p.date}：讚${p.likes || 0} 留${p.comments || 0} 分${p.shares || 0}（互動${engagement(p)}）${tags ? `　${tags}` : ""}${src ? `　${src}` : ""}${p.url ? `　${p.url}` : ""}`);
+      });
+      lines.push("");
+    }
+
+    // ── Top posts for reference ──
+    const topPosts = [...monthPosts].sort((a, b) => engagement(b) - engagement(a)).slice(0, 5);
+    lines.push("【本月互動 TOP 5 貼文】");
+    topPosts.forEach((p, i) => {
+      const grp = monthGroups[p.pageId] || "?";
+      const pageName = pages.find((x) => x.id === p.pageId)?.name || "";
+      lines.push(`  ${i + 1}. [${grp}組] ${pageName} ${p.date}：互動${engagement(p)}（讚${p.likes || 0}、留${p.comments || 0}、分${p.shares || 0}）${p.url ? `　${p.url}` : ""}`);
+    });
+    lines.push("");
+    lines.push("---");
+    lines.push("（互動總計 = 讚＋留言＋分享；粉絲增減為當月最新一筆減最舊一筆）");
 
     setGeneratedPrompt(lines.join("\n"));
     setCopied(false);
@@ -2332,57 +2394,22 @@ function ReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, s
           <SectionTitle icon="heart" title="本月最高讚貼文 TOP 10" />
           <PostRankTable posts={topLiked} pageMap={pageMap} metric="likes" metricLabel="讚數" showGroup={hasGroupData} getGroup={getGroup} />
 
-          <SectionTitle icon="edit" title="AI 貼文表現分析提示詞" />
+          <SectionTitle icon="edit" title="AI 月報分析提示詞" />
           <div style={styles.card}>
-            <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
-              選擇要分析的經銷商（不選則代表全部），點「產生提示詞」後會整理成一段文字，複製貼到 Claude 或其他 AI 工具即可取得分析。這個應用程式本身不會自動產生分析結果，需要你手動貼到 AI 工具中。
+            <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0, marginBottom: 16 }}>
+              點「產生提示詞」，系統會自動整理本月 A/B/C 各組的貼文數據、粉絲成長、點子王清單，產出一段完整的分析請求文字。複製後貼到 Claude 或 ChatGPT，即可取得符合月報格式的分析結論。
             </p>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
-              <div style={{ fontSize: 12.5, color: "#9C9684" }}>
-                已選 {promptPageIds.length} / {pages.length} 家（不選＝全部）
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button style={styles.secondaryBtn} onClick={() => setPromptPageIds(promptFilteredPages.map((p) => p.id))}>全選</button>
-                <button style={styles.secondaryBtn} onClick={() => setPromptPageIds([])}>全取消</button>
-              </div>
-            </div>
-            <input
-              style={{ ...styles.input, marginBottom: 10 }}
-              placeholder="搜尋粉絲團名稱、法人或地區，篩選下方清單…"
-              value={promptQuery}
-              onChange={(e) => setPromptQuery(e.target.value)}
-            />
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", maxHeight: 180, overflowY: "auto", marginBottom: 16 }}>
-              {promptFilteredPages.length === 0 ? (
-                <div style={{ fontSize: 12.5, color: "#A6A096" }}>沒有符合搜尋條件的粉絲團</div>
-              ) : (
-                promptFilteredPages.map((p) => {
-                  const active = promptPageIds.includes(p.id);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => togglePromptPage(p.id)}
-                      style={{ ...styles.chipBtn, ...(active ? styles.chipBtnActive : {}) }}
-                    >
-                      {p.name}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-
             <button style={styles.primaryBtn} onClick={buildPrompt}>
               <Icon name="spark" size={16} />
-              產生提示詞
+              產生 AI 分析提示詞
             </button>
-
             {generatedPrompt && (
               <div style={{ marginTop: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={{ fontSize: 12.5, color: "#9C9684" }}>已產生，可直接複製貼到 AI 工具</div>
+                  <div style={{ fontSize: 12.5, color: "#9C9684" }}>已產生 — 複製後貼到 Claude 或 ChatGPT</div>
                   <button style={styles.secondaryBtn} onClick={copyPrompt}>
                     <Icon name={copied ? "save" : "link"} size={15} />
-                    {copied ? "已複製" : "複製全部"}
+                    {copied ? "已複製 ✓" : "複製全部"}
                   </button>
                 </div>
                 <textarea
