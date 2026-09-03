@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Honda 粉絲團月報 2026年8月</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans TC',sans-serif;background:#F5F4F1;color:#1E1E1C;font-size:14px;line-height:1.6;}
+a{color:inherit;text-decoration:none;}
+
+/* ── Layout ── */
+.report{max-width:960px;margin:0 auto;padding:48px 32px 80px;}
+
+/* ── Cover ── */
+.cover{background:#1E1E1C;color:#F5F4F1;border-radius:20px;padding:56px 56px 48px;margin-bottom:48px;position:relative;overflow:hidden;}
+.cover::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 60px,rgba(255,255,255,.025) 60px,rgba(255,255,255,.025) 61px);}
+.cover-label{font-size:11px;letter-spacing:3px;color:#888;margin-bottom:16px;font-family:'Space Grotesk',sans-serif;text-transform:uppercase;}
+.cover h1{font-family:'Noto Serif TC',serif;font-size:36px;line-height:1.2;margin-bottom:8px;}
+.cover-sub{font-size:15px;color:#AAA;margin-bottom:32px;}
+.cover-stats{display:flex;gap:40px;flex-wrap:wrap;}
+.cover-stat .n{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:600;color:#F5F4F1;}
+.cover-stat .l{font-size:11px;color:#888;margin-top:2px;}
+
+/* ── Section ── */
+.section{margin-bottom:48px;}
+.section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:20px;}
+.section-head h2{font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;}
+.section-head .tag{font-size:11px;background:#1E1E1C;color:#fff;border-radius:4px;padding:2px 8px;font-family:'Space Grotesk',sans-serif;letter-spacing:.5px;}
+.section-head .tag.a{background:#3D6A63;}
+.section-head .tag.b{background:#7A5230;}
+.section-head .tag.c{background:#4E3D6E;}
+
+/* ── Group block ── */
+.group-block{background:#fff;border-radius:16px;overflow:hidden;margin-bottom:32px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.group-header{padding:16px 24px;display:flex;align-items:center;gap:12px;}
+.group-header.a{background:#EBF0EE;}
+.group-header.b{background:#F5EDE3;}
+.group-header.c{background:#EDE9F2;}
+.group-badge{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;}
+.group-badge.a{background:#3D6A63;color:#fff;}
+.group-badge.b{background:#7A5230;color:#fff;}
+.group-badge.c{background:#4E3D6E;color:#fff;}
+.group-header-info h3{font-size:14px;font-weight:700;}
+.group-header-info p{font-size:12px;color:#777;}
+
+/* ── Table ── */
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{padding:10px 16px;text-align:left;font-size:11px;color:#888;font-weight:500;border-bottom:1px solid #F0EDE8;white-space:nowrap;}
+.tbl th.r,.tbl td.r{text-align:right;}
+.tbl td{padding:10px 16px;border-bottom:1px solid #F7F5F2;font-size:13px;}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:#FAFAF8;}
+.num{font-family:'Space Grotesk',sans-serif;font-weight:500;}
+.pos{color:#2E6B50;font-weight:600;}
+.neg{color:#B03030;font-weight:600;}
+.zero{color:#AAA;}
+.rank-1{font-weight:700;}
+
+/* ── Tags ── */
+.tag-chip{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;margin:1px;background:#F0EDE8;color:#555;}
+.src-original{background:#DDE5E2;color:#2E5E57;}
+.src-repost{background:#EDE4D6;color:#7A5230;}
+.src-ai{background:#E2DDE8;color:#4E3D6E;}
+
+/* ── Star posts ── */
+.star-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.star-card{background:#fff;border-radius:12px;padding:16px;border:1px solid #EDE9E4;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.star-card .who{font-size:11px;color:#888;margin-bottom:4px;display:flex;align-items:center;gap:6px;}
+.star-card .headline{font-size:13px;font-weight:600;margin-bottom:8px;line-height:1.4;}
+.star-card .metrics{display:flex;gap:14px;font-family:'Space Grotesk',sans-serif;font-size:13px;}
+.star-card .metric span{font-size:10px;color:#AAA;display:block;}
+.star-card .link-btn{margin-top:10px;display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#3D6A63;background:#EBF0EE;padding:4px 10px;border-radius:6px;}
+
+/* ── Chart (SVG bars) ── */
+.chart-wrap{overflow-x:auto;padding:0 24px 16px;}
+
+/* ── Prompt box ── */
+.prompt-box{background:#1E1E1C;color:#E8E8E5;border-radius:14px;padding:28px 32px;font-size:13px;line-height:1.8;white-space:pre-wrap;font-family:'Space Grotesk',monospace;}
+.prompt-label{font-size:11px;letter-spacing:2px;color:#666;text-transform:uppercase;margin-bottom:12px;font-family:'Space Grotesk',sans-serif;}
+
+/* ── Divider ── */
+.divider{border:none;border-top:1px solid #E8E5E0;margin:40px 0;}
+
+/* ── Insight box ── */
+.insight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;}
+.insight-card{background:#fff;border-radius:12px;padding:18px 20px;border-left:4px solid #3D6A63;}
+.insight-card.b{border-color:#7A5230;}
+.insight-card.c{border-color:#4E3D6E;}
+.insight-card .ic-label{font-size:11px;color:#AAA;font-weight:500;margin-bottom:4px;}
+.insight-card .ic-val{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;}
+.insight-card .ic-name{font-size:12px;color:#666;margin-top:2px;}
+</style>
+</head>
+<body>
+<div class="report">
+
+<!-- ── COVER ── -->
+<div class="cover">
+  <div class="cover-label">Honda Taiwan · 粉絲團競賽月報</div>
+  <h1>2026年8月<br/>粉絲團月報</h1>
+  <div class="cover-sub">A / B / C 三組競賽成果 · 貼文表現分析 · 點子王清單</div>
+  <div class="cover-stats">
+    <div class="cover-stat"><div class="n">23</div><div class="l">參賽經銷商</div></div>
+    <div class="cover-stat"><div class="n">166</div><div class="l">本月貼文</div></div>
+    <div class="cover-stat"><div class="n">7,933</div><div class="l">貼文互動總計</div></div>
+    <div class="cover-stat"><div class="n">17</div><div class="l">點子王貼文</div></div>
+  </div>
+</div>
+
+<!-- ── SECTION 1: 各組粉絲成長 ── -->
+<div class="section">
+  <div class="section-head">
+    <h2>粉絲數成長排名</h2>
+    <span style="font-size:12px;color:#999;">8/5 → 8/31，增減數排名</span>
+  </div>
+
+  <!-- A組 -->
+  <div class="group-block">
+    <div class="group-header a">
+      <div class="group-badge a">A</div>
+      <div class="group-header-info">
+        <h3>A 組 粉絲成長排名</h3>
+        <p>共 5 家 · 最高增長：北市科 +139</p>
+      </div>
+    </div>
+    <div class="chart-wrap" style="padding:16px 24px;">
+      <svg width="860" height="180" style="display:block;font-family:'Space Grotesk',sans-serif;">
+        <!-- bars for A group sorted by diff -->
+        <!-- 北市科 +139, 經國 +29, 左營店 +17, 內湖 +1, 板橋 -1 -->
+        <g>
+          <!-- X axis -->
+          <line x1="160" x2="820" y1="155" y2="155" stroke="#E8E5E0" stroke-width="1"/>
+          <!-- Zero line at x=160 for this dataset (all positive except -1) -->
+          <!-- Scale: max=139, barArea=640 -->
+          <!-- Row height=28 -->
+          <!-- 北市科 -->
+          <text x="155" y="28" text-anchor="end" font-size="12" fill="#333">北市科</text>
+          <rect x="160" y="14" width="644" height="18" rx="4" fill="#3D6A63"/>
+          <text x="812" y="28" font-size="12" fill="#2E6B50" font-weight="600">+139</text>
+          <!-- 經國 -->
+          <text x="155" y="60" text-anchor="end" font-size="12" fill="#333">經國</text>
+          <rect x="160" y="46" width="134" height="18" rx="4" fill="#3D6A63" opacity=".7"/>
+          <text x="298" y="60" font-size="12" fill="#2E6B50" font-weight="600">+29</text>
+          <!-- 左營店 -->
+          <text x="155" y="92" text-anchor="end" font-size="12" fill="#333">左營店</text>
+          <rect x="160" y="78" width="78" height="18" rx="4" fill="#3D6A63" opacity=".5"/>
+          <text x="242" y="92" font-size="12" fill="#2E6B50" font-weight="600">+17</text>
+          <!-- 內湖 -->
+          <text x="155" y="124" text-anchor="end" font-size="12" fill="#333">內湖</text>
+          <rect x="160" y="110" width="5" height="18" rx="2" fill="#3D6A63" opacity=".3"/>
+          <text x="169" y="124" font-size="12" fill="#2E6B50" font-weight="600">+1</text>
+          <!-- 板橋 -->
+          <text x="155" y="156" text-anchor="end" font-size="12" fill="#333">板橋</text>
+          <rect x="155" y="142" width="5" height="18" rx="2" fill="#B03030" opacity=".6"/>
+          <text x="163" y="156" font-size="12" fill="#B03030" font-weight="600">-1</text>
+        </g>
+      </svg>
+    </div>
+    <table class="tbl">
+      <thead><tr>
+        <th>排名</th><th>粉絲團</th>
+        <th class="r">8/5 人數</th><th class="r">8/31 人數</th>
+        <th class="r">增減</th><th class="r">本月貼文</th><th class="r">互動總計</th><th class="r">均互動</th>
+      </tr></thead>
+      <tbody>
+        <tr class="rank-1"><td>🏆</td><td>北市科</td><td class="r num">3,527</td><td class="r num">3,666</td><td class="r num pos">+139</td><td class="r num">21</td><td class="r num">2,061</td><td class="r num">98.1</td></tr>
+        <tr><td>2</td><td>經國</td><td class="r num">3,189</td><td class="r num">3,218</td><td class="r num pos">+29</td><td class="r num">13</td><td class="r num">816</td><td class="r num">62.8</td></tr>
+        <tr><td>3</td><td>左營店</td><td class="r num">1,800</td><td class="r num">1,817</td><td class="r num pos">+17</td><td class="r num">4</td><td class="r num">165</td><td class="r num">41.3</td></tr>
+        <tr><td>4</td><td>內湖</td><td class="r num">1,815</td><td class="r num">1,816</td><td class="r num pos">+1</td><td class="r num">4</td><td class="r num">61</td><td class="r num">15.3</td></tr>
+        <tr><td>5</td><td>板橋</td><td class="r num">1,984</td><td class="r num">1,983</td><td class="r num neg">-1</td><td class="r num">6</td><td class="r num">274</td><td class="r num">45.7</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- B組 -->
+  <div class="group-block">
+    <div class="group-header b">
+      <div class="group-badge b">B</div>
+      <div class="group-header-info">
+        <h3>B 組 粉絲成長排名</h3>
+        <p>共 9 家 · 最高增長：中台中 +237</p>
+      </div>
+    </div>
+    <table class="tbl">
+      <thead><tr>
+        <th>排名</th><th>粉絲團</th>
+        <th class="r">8/5 人數</th><th class="r">8/31 人數</th>
+        <th class="r">增減</th><th class="r">本月貼文</th><th class="r">互動總計</th><th class="r">均互動</th>
+      </tr></thead>
+      <tbody>
+        <tr class="rank-1"><td>🏆</td><td>中台中</td><td class="r num">1,011</td><td class="r num">1,248</td><td class="r num pos">+237</td><td class="r num">5</td><td class="r num">1,176</td><td class="r num">235.2</td></tr>
+        <tr><td>2</td><td>苗栗</td><td class="r num">684</td><td class="r num">693</td><td class="r num pos">+9</td><td class="r num">5</td><td class="r num">534</td><td class="r num">106.8</td></tr>
+        <tr><td>3</td><td>新竹</td><td class="r num">460</td><td class="r num">465</td><td class="r num pos">+5</td><td class="r num">6</td><td class="r num">150</td><td class="r num">25.0</td></tr>
+        <tr><td>4</td><td>永康</td><td class="r num">1,168</td><td class="r num">1,172</td><td class="r num pos">+4</td><td class="r num">9</td><td class="r num">217</td><td class="r num">24.1</td></tr>
+        <tr><td>5</td><td>九如</td><td class="r num">140</td><td class="r num">143</td><td class="r num pos">+3</td><td class="r num">8</td><td class="r num">146</td><td class="r num">18.3</td></tr>
+        <tr><td>6</td><td>嘉義</td><td class="r num">961</td><td class="r num">962</td><td class="r num pos">+1</td><td class="r num">4</td><td class="r num">25</td><td class="r num">6.3</td></tr>
+        <tr><td>7</td><td>員林</td><td class="r num">190</td><td class="r num">190</td><td class="r num zero">0</td><td class="r num">4</td><td class="r num">31</td><td class="r num">7.8</td></tr>
+        <tr><td>8</td><td>頭份</td><td class="r num">862</td><td class="r num">862</td><td class="r num zero">0</td><td class="r num">7</td><td class="r num">37</td><td class="r num">5.3</td></tr>
+        <tr><td>9</td><td>太平</td><td class="r num">127</td><td class="r num">126</td><td class="r num neg">-1</td><td class="r num">4</td><td class="r num">8</td><td class="r num">2.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- C組 -->
+  <div class="group-block">
+    <div class="group-header c">
+      <div class="group-badge c">C</div>
+      <div class="group-header-info">
+        <h3>C 組 粉絲成長排名</h3>
+        <p>共 9 家 · 最高增長：民族 +345</p>
+      </div>
+    </div>
+    <table class="tbl">
+      <thead><tr>
+        <th>排名</th><th>粉絲團</th>
+        <th class="r">8/5 人數</th><th class="r">8/31 人數</th>
+        <th class="r">增減</th><th class="r">本月貼文</th><th class="r">互動總計</th><th class="r">均互動</th>
+      </tr></thead>
+      <tbody>
+        <tr class="rank-1"><td>🏆</td><td>民族</td><td class="r num">57</td><td class="r num">402</td><td class="r num pos">+345</td><td class="r num">25</td><td class="r num">311</td><td class="r num">12.4</td></tr>
+        <tr><td>2</td><td>北台中</td><td class="r num">557</td><td class="r num">594</td><td class="r num pos">+37</td><td class="r num">3</td><td class="r num">43</td><td class="r num">14.3</td></tr>
+        <tr><td>3</td><td>西台南</td><td class="r num">176</td><td class="r num">199</td><td class="r num pos">+23</td><td class="r num">10</td><td class="r num">524</td><td class="r num">52.4</td></tr>
+        <tr><td>4</td><td>竹東</td><td class="r num">1,375</td><td class="r num">1,389</td><td class="r num pos">+14</td><td class="r num">1</td><td class="r num">20</td><td class="r num">20.0</td></tr>
+        <tr><td>5</td><td>松山</td><td class="r num">490</td><td class="r num">499</td><td class="r num pos">+9</td><td class="r num">1</td><td class="r num">28</td><td class="r num">28.0</td></tr>
+        <tr><td>6</td><td>土城</td><td class="r num">614</td><td class="r num">620</td><td class="r num pos">+6</td><td class="r num">8</td><td class="r num">31</td><td class="r num">3.9</td></tr>
+        <tr><td>7</td><td>新北汐止</td><td class="r num">902</td><td class="r num">905</td><td class="r num pos">+3</td><td class="r num">7</td><td class="r num">167</td><td class="r num">23.9</td></tr>
+        <tr><td>8</td><td>花蓮</td><td class="r num">234</td><td class="r num">237</td><td class="r num pos">+3</td><td class="r num">7</td><td class="r num">5</td><td class="r num">0.7</td></tr>
+        <tr><td>9</td><td>中華</td><td class="r num">587</td><td class="r num">591</td><td class="r num pos">+4</td><td class="r num">4</td><td class="r num">22</td><td class="r num">5.5</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION 2: 貼文互動排名 ── -->
+<div class="section">
+  <div class="section-head">
+    <h2>貼文互動排名</h2>
+    <span style="font-size:12px;color:#999;">讚＋留言＋分享，各組前三名</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+    <!-- A組 -->
+    <div class="group-block">
+      <div class="group-header a" style="padding:12px 18px;">
+        <div class="group-badge a" style="width:28px;height:28px;font-size:13px;">A</div>
+        <div class="group-header-info"><h3 style="font-size:13px;">A 組互動排名</h3></div>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>粉絲團</th><th class="r">篇數</th><th class="r">互動</th><th class="r">均互動</th></tr></thead>
+        <tbody>
+          <tr class="rank-1"><td>🏆 北市科</td><td class="r num">21</td><td class="r num">2,061</td><td class="r num pos">98.1</td></tr>
+          <tr><td>經國</td><td class="r num">13</td><td class="r num">816</td><td class="r num">62.8</td></tr>
+          <tr><td>板橋</td><td class="r num">6</td><td class="r num">274</td><td class="r num">45.7</td></tr>
+          <tr><td>左營店</td><td class="r num">4</td><td class="r num">165</td><td class="r num">41.3</td></tr>
+          <tr><td>內湖</td><td class="r num">4</td><td class="r num">61</td><td class="r num">15.3</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- B組 -->
+    <div class="group-block">
+      <div class="group-header b" style="padding:12px 18px;">
+        <div class="group-badge b" style="width:28px;height:28px;font-size:13px;">B</div>
+        <div class="group-header-info"><h3 style="font-size:13px;">B 組互動排名</h3></div>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>粉絲團</th><th class="r">篇數</th><th class="r">互動</th><th class="r">均互動</th></tr></thead>
+        <tbody>
+          <tr class="rank-1"><td>🏆 中台中</td><td class="r num">5</td><td class="r num">1,176</td><td class="r num pos">235.2</td></tr>
+          <tr><td>苗栗</td><td class="r num">5</td><td class="r num">534</td><td class="r num">106.8</td></tr>
+          <tr><td>永康</td><td class="r num">9</td><td class="r num">217</td><td class="r num">24.1</td></tr>
+          <tr><td>新竹</td><td class="r num">6</td><td class="r num">150</td><td class="r num">25.0</td></tr>
+          <tr><td>九如</td><td class="r num">8</td><td class="r num">146</td><td class="r num">18.3</td></tr>
+          <tr><td>頭份</td><td class="r num">7</td><td class="r num">37</td><td class="r num">5.3</td></tr>
+          <tr><td>員林</td><td class="r num">4</td><td class="r num">31</td><td class="r num">7.8</td></tr>
+          <tr><td>嘉義</td><td class="r num">4</td><td class="r num">25</td><td class="r num">6.3</td></tr>
+          <tr><td>太平</td><td class="r num">4</td><td class="r num">8</td><td class="r num">2.0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- C組 -->
+    <div class="group-block">
+      <div class="group-header c" style="padding:12px 18px;">
+        <div class="group-badge c" style="width:28px;height:28px;font-size:13px;">C</div>
+        <div class="group-header-info"><h3 style="font-size:13px;">C 組互動排名</h3></div>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>粉絲團</th><th class="r">篇數</th><th class="r">互動</th><th class="r">均互動</th></tr></thead>
+        <tbody>
+          <tr class="rank-1"><td>🏆 西台南</td><td class="r num">10</td><td class="r num">524</td><td class="r num pos">52.4</td></tr>
+          <tr><td>民族</td><td class="r num">25</td><td class="r num">311</td><td class="r num">12.4</td></tr>
+          <tr><td>新北汐止</td><td class="r num">7</td><td class="r num">167</td><td class="r num">23.9</td></tr>
+          <tr><td>北台中</td><td class="r num">3</td><td class="r num">43</td><td class="r num">14.3</td></tr>
+          <tr><td>松山</td><td class="r num">1</td><td class="r num">28</td><td class="r num">28.0</td></tr>
+          <tr><td>竹東</td><td class="r num">1</td><td class="r num">20</td><td class="r num">20.0</td></tr>
+          <tr><td>土城</td><td class="r num">8</td><td class="r num">31</td><td class="r num">3.9</td></tr>
+          <tr><td>中華</td><td class="r num">4</td><td class="r num">22</td><td class="r num">5.5</td></tr>
+          <tr><td>花蓮</td><td class="r num">7</td><td class="r num">5</td><td class="r num">0.7</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION 3: 貼文類型分析 ── -->
+<div class="section">
+  <div class="section-head">
+    <h2>各組貼文類型與內容分佈</h2>
+    <span style="font-size:12px;color:#999;">自製 / 轉發 · 內容標籤</span>
+  </div>
+  <div class="group-block">
+    <table class="tbl">
+      <thead><tr>
+        <th>組</th><th>粉絲團</th><th class="r">總篇</th>
+        <th class="r">自製</th><th class="r">轉發</th>
+        <th>主要內容</th><th class="r">⭐點子王</th>
+      </tr></thead>
+      <tbody>
+        <tr style="background:#F7FAF9;"><td><span style="color:#3D6A63;font-weight:700;">A</span></td><td>北市科</td><td class="r num">21</td><td class="r num">20</td><td class="r num">1</td><td><span class="tag-chip">創意×11</span><span class="tag-chip">促銷×5</span><span class="tag-chip">公告×3</span></td><td class="r num">⭐ 2</td></tr>
+        <tr style="background:#F7FAF9;"><td><span style="color:#3D6A63;font-weight:700;">A</span></td><td>經國</td><td class="r num">13</td><td class="r num">13</td><td class="r num zero">—</td><td><span class="tag-chip">創意×5</span><span class="tag-chip">新車宣傳×4</span><span class="tag-chip">小知識×4</span></td><td class="r num">⭐ 2</td></tr>
+        <tr style="background:#F7FAF9;"><td><span style="color:#3D6A63;font-weight:700;">A</span></td><td>板橋</td><td class="r num">6</td><td class="r num">5</td><td class="r num">1</td><td><span class="tag-chip">創意×4</span><span class="tag-chip">新車宣傳×2</span></td><td class="r num">⭐ 1</td></tr>
+        <tr style="background:#F7FAF9;"><td><span style="color:#3D6A63;font-weight:700;">A</span></td><td>左營店</td><td class="r num">4</td><td class="r num">2</td><td class="r num">2</td><td><span class="tag-chip">各類×1</span></td><td class="r num zero">—</td></tr>
+        <tr style="background:#F7FAF9;"><td><span style="color:#3D6A63;font-weight:700;">A</span></td><td>內湖</td><td class="r num">4</td><td class="r num">1</td><td class="r num">3</td><td><span class="tag-chip">新車宣傳×2</span><span class="tag-chip">創意×1</span></td><td class="r num">⭐ 1</td></tr>
+        <tr style="border-top:2px solid #F0EDE8;"><td><span style="color:#7A5230;font-weight:700;">B</span></td><td>中台中</td><td class="r num">5</td><td class="r num">5</td><td class="r num zero">—</td><td><span class="tag-chip">小知識×3</span><span class="tag-chip">新車宣傳×1</span></td><td class="r num zero">—</td></tr>
+        <tr><td><span style="color:#7A5230;font-weight:700;">B</span></td><td>苗栗</td><td class="r num">5</td><td class="r num">4</td><td class="r num">1</td><td><span class="tag-chip">創意×3</span><span class="tag-chip">促銷×1</span></td><td class="r num">⭐ 2</td></tr>
+        <tr><td><span style="color:#7A5230;font-weight:700;">B</span></td><td>新竹</td><td class="r num">6</td><td class="r num">5</td><td class="r num">1</td><td><span class="tag-chip">創意×3</span><span class="tag-chip">其他×2</span></td><td class="r num">⭐ 3</td></tr>
+        <tr><td><span style="color:#7A5230;font-weight:700;">B</span></td><td>九如</td><td class="r num">8</td><td class="r num">7</td><td class="r num">1</td><td><span class="tag-chip">公告×3</span><span class="tag-chip">促銷×2</span></td><td class="r num">⭐ 1</td></tr>
+        <tr><td><span style="color:#7A5230;font-weight:700;">B</span></td><td>永康</td><td class="r num">9</td><td class="r num">5</td><td class="r num">4</td><td><span class="tag-chip">公告×5</span><span class="tag-chip">其他×2</span></td><td class="r num zero">—</td></tr>
+        <tr><td><span style="color:#7A5230;font-weight:700;">B</span></td><td>頭份</td><td class="r num">7</td><td class="r num">7</td><td class="r num zero">—</td><td><span class="tag-chip">創意×5</span><span class="tag-chip">公告×2</span></td><td class="r num">⭐ 2</td></tr>
+        <tr><td><span style="color:#7A5230;font-weight:700;">B</span></td><td>嘉義</td><td class="r num">4</td><td class="r num">2</td><td class="r num">2</td><td><span class="tag-chip">各類×1</span></td><td class="r num zero">—</td></tr>
+        <tr><td><span style="color:#7A5230;font-weight:700;">B</span></td><td>員林</td><td class="r num">4</td><td class="r num">2</td><td class="r num">2</td><td><span class="tag-chip">創意×2</span></td><td class="r num">⭐ 1</td></tr>
+        <tr><td><span style="color:#7A5230;font-weight:700;">B</span></td><td>太平</td><td class="r num">4</td><td class="r num">3</td><td class="r num">1</td><td><span class="tag-chip">公告×3</span><span class="tag-chip">促銷×1</span></td><td class="r num zero">—</td></tr>
+        <tr style="border-top:2px solid #F0EDE8;"><td><span style="color:#4E3D6E;font-weight:700;">C</span></td><td>民族</td><td class="r num">25</td><td class="r num">12</td><td class="r num">13</td><td><span class="tag-chip">新車宣傳×10</span><span class="tag-chip">其他×5</span></td><td class="r num zero">—</td></tr>
+        <tr><td><span style="color:#4E3D6E;font-weight:700;">C</span></td><td>西台南</td><td class="r num">10</td><td class="r num">10</td><td class="r num zero">—</td><td><span class="tag-chip">其他×8</span><span class="tag-chip">公告×1</span></td><td class="r num zero">—</td></tr>
+        <tr><td><span style="color:#4E3D6E;font-weight:700;">C</span></td><td>土城</td><td class="r num">8</td><td class="r num">1</td><td class="r num">7</td><td><span class="tag-chip">新車宣傳×5</span><span class="tag-chip">其他×2</span></td><td class="r num zero">—</td></tr>
+        <tr><td><span style="color:#4E3D6E;font-weight:700;">C</span></td><td>花蓮</td><td class="r num">7</td><td class="r num zero">—</td><td class="r num">7</td><td><span class="tag-chip">新車宣傳×2</span></td><td class="r num zero">—</td></tr>
+        <tr><td><span style="color:#4E3D6E;font-weight:700;">C</span></td><td>新北汐止</td><td class="r num">7</td><td class="r num">7</td><td class="r num zero">—</td><td><span class="tag-chip">新車宣傳×2</span><span class="tag-chip">促銷×2</span></td><td class="r num">⭐ 1</td></tr>
+        <tr><td><span style="color:#4E3D6E;font-weight:700;">C</span></td><td>中華</td><td class="r num">4</td><td class="r num">2</td><td class="r num">2</td><td><span class="tag-chip">創意×2</span><span class="tag-chip">公告×1</span></td><td class="r num zero">—</td></tr>
+        <tr><td><span style="color:#4E3D6E;font-weight:700;">C</span></td><td>北台中</td><td class="r num">3</td><td class="r num">1</td><td class="r num">2</td><td><span class="tag-chip">公告×2</span><span class="tag-chip">創意×1</span></td><td class="r num">⭐ 1</td></tr>
+        <tr><td><span style="color:#4E3D6E;font-weight:700;">C</span></td><td>竹東</td><td class="r num">1</td><td class="r num">1</td><td class="r num zero">—</td><td><span class="tag-chip">交車×1</span></td><td class="r num zero">—</td></tr>
+        <tr><td><span style="color:#4E3D6E;font-weight:700;">C</span></td><td>松山</td><td class="r num">1</td><td class="r num">1</td><td class="r num zero">—</td><td><span class="tag-chip">創意×1</span></td><td class="r num zero">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION 4: 點子王 ── -->
+<div class="section">
+  <div class="section-head">
+    <h2>⭐ 點子王貼文清單</h2>
+    <span style="font-size:12px;color:#999;">8月共 17 篇</span>
+  </div>
+  <div class="star-grid">
+
+    <div class="star-card">
+      <div class="who"><span style="background:#DDE5E2;color:#3D6A63;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">A 組</span>北市科 · 2026/08/11</div>
+      <div class="headline">創意貼文 · 影片</div>
+      <div class="metrics">
+        <div>77 <span>讚</span></div><div>13 <span>留言</span></div><div>11 <span>分享</span></div><div style="font-weight:700;">101 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/r/1B2ynh1MLP/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#DDE5E2;color:#3D6A63;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">A 組</span>北市科 · 2026/08/28</div>
+      <div class="headline">創意貼文 · 影片</div>
+      <div class="metrics">
+        <div>28 <span>讚</span></div><div>4 <span>留言</span></div><div>0 <span>分享</span></div><div style="font-weight:700;">32 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/v/19PCZnR14e/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#DDE5E2;color:#3D6A63;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">A 組</span>板橋 · 2026/08/07</div>
+      <div class="headline">創意貼文</div>
+      <div class="metrics">
+        <div>67 <span>讚</span></div><div>4 <span>留言</span></div><div>3 <span>分享</span></div><div style="font-weight:700;">74 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/r/1Cwo4o9Sj3/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#DDE5E2;color:#3D6A63;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">A 組</span>內湖 · 2026/08/13</div>
+      <div class="headline">創意貼文</div>
+      <div class="metrics">
+        <div>33 <span>讚</span></div><div>7 <span>留言</span></div><div>1 <span>分享</span></div><div style="font-weight:700;">41 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/r/18LN8SeRvM/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#DDE5E2;color:#3D6A63;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">A 組</span>經國 · 2026/08/11</div>
+      <div class="headline">創意 · 新車宣傳</div>
+      <div class="metrics">
+        <div>11 <span>讚</span></div><div>0 <span>留言</span></div><div>2 <span>分享</span></div><div style="font-weight:700;">13 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/v/1Bkevsrmtr/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#DDE5E2;color:#3D6A63;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">A 組</span>經國 · 2026/08/24</div>
+      <div class="headline">創意 · 新車宣傳</div>
+      <div class="metrics">
+        <div>30 <span>讚</span></div><div>0 <span>留言</span></div><div>0 <span>分享</span></div><div style="font-weight:700;">30 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/r/19MJhPyXdJ/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#EDE4D6;color:#7A5230;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">B 組</span>苗栗 · 2026/08/04</div>
+      <div class="headline">創意貼文 🔥 本月最高互動</div>
+      <div class="metrics">
+        <div>200 <span>讚</span></div><div>63 <span>留言</span></div><div>23 <span>分享</span></div><div style="font-weight:700;color:#2E6B50;">286 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/r/1Hyjv6v4aa/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#EDE4D6;color:#7A5230;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">B 組</span>苗栗 · 2026/08/18</div>
+      <div class="headline">創意貼文</div>
+      <div class="metrics">
+        <div>88 <span>讚</span></div><div>30 <span>留言</span></div><div>0 <span>分享</span></div><div style="font-weight:700;">118 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/r/14jihBEwcAh/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#EDE4D6;color:#7A5230;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">B 組</span>新竹 · 2026/08/07</div>
+      <div class="headline">創意貼文</div>
+      <div class="metrics">
+        <div>20 <span>讚</span></div><div>0 <span>留言</span></div><div>3 <span>分享</span></div><div style="font-weight:700;">23 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/r/1DU4FP8zeD/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#EDE4D6;color:#7A5230;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">B 組</span>新竹 · 2026/08/14</div>
+      <div class="headline">創意貼文</div>
+      <div class="metrics">
+        <div>11 <span>讚</span></div><div>0 <span>留言</span></div><div>1 <span>分享</span></div><div style="font-weight:700;">12 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/r/1aHrwNv5Ln/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#EDE4D6;color:#7A5230;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">B 組</span>新竹 · 2026/08/19</div>
+      <div class="headline">創意貼文 · 影片</div>
+      <div class="metrics">
+        <div>15 <span>讚</span></div><div>0 <span>留言</span></div><div>3 <span>分享</span></div><div style="font-weight:700;">18 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/v/1DWzpsangq/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#EDE4D6;color:#7A5230;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">B 組</span>九如 · 2026/08/13</div>
+      <div class="headline">創意貼文</div>
+      <div class="metrics">
+        <div>16 <span>讚</span></div><div>1 <span>留言</span></div><div>5 <span>分享</span></div><div style="font-weight:700;">22 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/r/19DHGFeZYh/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#EDE4D6;color:#7A5230;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">B 組</span>員林 · 2026/08/27</div>
+      <div class="headline">創意貼文 · 影片</div>
+      <div class="metrics">
+        <div>10 <span>讚</span></div><div>0 <span>留言</span></div><div>0 <span>分享</span></div><div style="font-weight:700;">10 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/v/1LZo8rSsiF/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#EDE4D6;color:#7A5230;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">B 組</span>頭份 · 2026/08/19</div>
+      <div class="headline">創意貼文 · 影片</div>
+      <div class="metrics">
+        <div>6 <span>讚</span></div><div>0 <span>留言</span></div><div>0 <span>分享</span></div><div style="font-weight:700;">6 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/v/1GKdcDDa4R/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#EDE4D6;color:#7A5230;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">B 組</span>頭份 · 2026/08/24</div>
+      <div class="headline">創意貼文 · 影片</div>
+      <div class="metrics">
+        <div>4 <span>讚</span></div><div>0 <span>留言</span></div><div>0 <span>分享</span></div><div style="font-weight:700;">4 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/v/1czoe6sSJ2/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#E2DDE8;color:#4E3D6E;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">C 組</span>新北汐止 · 2026/08/01</div>
+      <div class="headline">創意貼文</div>
+      <div class="metrics">
+        <div>20 <span>讚</span></div><div>0 <span>留言</span></div><div>4 <span>分享</span></div><div style="font-weight:700;">24 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/p/1FKhWNVCda/" target="_blank">→ 查看貼文</a>
+    </div>
+
+    <div class="star-card">
+      <div class="who"><span style="background:#E2DDE8;color:#4E3D6E;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">C 組</span>北台中 · 2026/08/28</div>
+      <div class="headline">創意貼文 · 影片</div>
+      <div class="metrics">
+        <div>11 <span>讚</span></div><div>1 <span>留言</span></div><div>8 <span>分享</span></div><div style="font-weight:700;">20 <span>互動</span></div>
+      </div>
+      <a class="link-btn" href="https://www.facebook.com/share/v/19ToqTqkNb/" target="_blank">→ 查看貼文</a>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION 5: 各組整體表現 ── -->
+<div class="section">
+  <div class="section-head">
+    <h2>各組整體表現總覽</h2>
+    <span style="font-size:12px;color:#999;">發文數 · 互動 · 效率 · 點子王</span>
+  </div>
+  <div class="group-block">
+    <table class="tbl">
+      <thead><tr>
+        <th>組別</th><th class="r">家數</th><th class="r">總發文</th>
+        <th class="r">總互動</th><th class="r">均互動/篇</th>
+        <th class="r">粉絲淨增</th><th class="r">點子王</th>
+      </tr></thead>
+      <tbody>
+        <tr class="rank-1">
+          <td><span style="background:#DDE5E2;color:#3D6A63;padding:2px 10px;border-radius:5px;font-weight:700;">A 組</span></td>
+          <td class="r num">5</td><td class="r num">48</td>
+          <td class="r num">3,377</td><td class="r num pos">70.4</td>
+          <td class="r num pos">+185</td><td class="r num">⭐ 6</td>
+        </tr>
+        <tr>
+          <td><span style="background:#EDE4D6;color:#7A5230;padding:2px 10px;border-radius:5px;font-weight:700;">B 組</span></td>
+          <td class="r num">9</td><td class="r num">52</td>
+          <td class="r num">2,324</td><td class="r num">44.7</td>
+          <td class="r num pos">+258</td><td class="r num">⭐ 9</td>
+        </tr>
+        <tr>
+          <td><span style="background:#E2DDE8;color:#4E3D6E;padding:2px 10px;border-radius:5px;font-weight:700;">C 組</span></td>
+          <td class="r num">9</td><td class="r num">66</td>
+          <td class="r num">1,151</td><td class="r num neg">17.4</td>
+          <td class="r num pos">+444</td><td class="r num">⭐ 2</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px;">
+    <div style="background:#EBF0EE;border-radius:12px;padding:18px 20px;border-left:4px solid #3D6A63;">
+      <div style="font-size:11px;color:#888;margin-bottom:6px;">A 組觀察</div>
+      <div style="font-size:13px;line-height:1.7;color:#2A2A28;">以最少家數創造最高單篇互動效率（70.4/篇）。組內表現均衡，除內湖外其餘4家效率皆在40以上，是本月最穩健的一組。</div>
+    </div>
+    <div style="background:#F5EDE3;border-radius:12px;padding:18px 20px;border-left:4px solid #7A5230;">
+      <div style="font-size:11px;color:#888;margin-bottom:6px;">B 組觀察</div>
+      <div style="font-size:13px;line-height:1.7;color:#2A2A28;">呈現明顯兩極化：中台中（235.2/篇）、苗栗（106.8/篇）效率極高，但組內半數效率低於10，整體高度依賴少數強棒經銷商。</div>
+    </div>
+    <div style="background:#EDE9F2;border-radius:12px;padding:18px 20px;border-left:4px solid #4E3D6E;">
+      <div style="font-size:11px;color:#888;margin-bottom:6px;">C 組觀察</div>
+      <div style="font-size:13px;line-height:1.7;color:#2A2A28;">發文量最多（66篇）但互動最低（17.4/篇）。粉絲淨增+444主要來自民族一家（+345），疑似廣告導流，需釐清成長來源。</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION 6: 本月亮點經銷商 ── -->
+<div class="section">
+  <div class="section-head">
+    <h2>本月表現亮點</h2>
+    <span style="font-size:12px;color:#999;">全體23家中最值得關注的3家</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+
+    <div style="background:#fff;border-radius:14px;padding:24px;border:1px solid #E8E5E0;box-shadow:0 1px 4px rgba(0,0,0,.05);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div style="width:36px;height:36px;border-radius:10px;background:#3D6A63;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">A</div>
+        <div>
+          <div style="font-weight:700;font-size:15px;">北市科</div>
+          <div style="font-size:11px;color:#999;">互動總計 2,061 · 全體第一</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;">98.1</div>
+          <div style="font-size:10px;color:#999;margin-top:2px;">均互動/篇</div>
+        </div>
+        <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;">+139</div>
+          <div style="font-size:10px;color:#999;margin-top:2px;">粉絲淨增</div>
+        </div>
+      </div>
+      <div style="font-size:12.5px;color:#555;line-height:1.7;">內容配置得宜：21篇中創意11篇、促銷5篇，幾乎沒有純公告類貼文，兼顧聲量與轉換。高頻率（21篇/月）且互動效率不打折，是本月最值得標竿的經銷商。</div>
+    </div>
+
+    <div style="background:#fff;border-radius:14px;padding:24px;border:1px solid #E8E5E0;box-shadow:0 1px 4px rgba(0,0,0,.05);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div style="width:36px;height:36px;border-radius:10px;background:#7A5230;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">B</div>
+        <div>
+          <div style="font-weight:700;font-size:15px;">中台中</div>
+          <div style="font-size:11px;color:#999;">單篇效率 235.2 · 全體最高</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#7A5230;">235.2</div>
+          <div style="font-size:10px;color:#999;margin-top:2px;">均互動/篇</div>
+        </div>
+        <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#7A5230;">+237</div>
+          <div style="font-size:10px;color:#999;margin-top:2px;">粉絲淨增</div>
+        </div>
+      </div>
+      <div style="font-size:12.5px;color:#555;line-height:1.7;">5篇創造1,176次互動，主力為「小知識」內容（3篇），顯示知識型內容對Honda車主社群具高度吸引力。⚠️ 粉絲成長幅度異常，建議確認是否有搭配廣告投放。</div>
+    </div>
+
+    <div style="background:#fff;border-radius:14px;padding:24px;border:1px solid #E8E5E0;box-shadow:0 1px 4px rgba(0,0,0,.05);">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+        <div style="width:36px;height:36px;border-radius:10px;background:#7A5230;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;">B</div>
+        <div>
+          <div style="font-weight:700;font-size:15px;">苗栗</div>
+          <div style="font-size:11px;color:#999;">8/4 單篇互動286 · 本月最高</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+        <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#7A5230;">106.8</div>
+          <div style="font-size:10px;color:#999;margin-top:2px;">均互動/篇</div>
+        </div>
+        <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#7A5230;">⭐ 2</div>
+          <div style="font-size:10px;color:#999;margin-top:2px;">點子王貼文</div>
+        </div>
+      </div>
+      <div style="font-size:12.5px;color:#555;line-height:1.7;">5篇中3篇創意，8/4單篇（讚200、留言63、分享23）是全體最高互動貼文。「少量高質」策略的代表案例，聚焦創意內容、篇篇有質感。</div>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION 7: 策略觀察 ── -->
+<div class="section">
+  <div class="section-head">
+    <h2>貼文策略觀察</h2>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+
+    <div style="background:#fff;border-radius:14px;padding:22px;border:1px solid #E8E5E0;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#3D6A63;display:inline-block;"></span>
+        創意內容是互動核心驅動力
+      </div>
+      <div style="font-size:12.5px;color:#555;line-height:1.8;">本月17篇點子王幾乎全集中在「創意」類型。北市科（創意佔52%）、苗栗（創意佔60%）等效率高的經銷商主力都是創意類。<strong>創意內容與高互動存在清楚的正向關係</strong>，是最值得優先投入的方向。</div>
+    </div>
+
+    <div style="background:#fff;border-radius:14px;padding:22px;border:1px solid #E8E5E0;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#C08040;display:inline-block;"></span>
+        公告類內容效率明顯偏低
+      </div>
+      <div style="font-size:12.5px;color:#555;line-height:1.8;">永康（公告5篇，效率24.1）、太平（公告3篇，效率2.0）、九如（公告3篇，效率18.2）——公告佔比高的經銷商效率都落後。公告有其必要性，但佔比應控制在<strong>三成以內</strong>，並嘗試以創意手法包裝。</div>
+    </div>
+
+    <div style="background:#fff;border-radius:14px;padding:22px;border:1px solid #E8E5E0;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+        <span style="width:8px;height:8px;border-radius:50%;background:#B03030;display:inline-block;"></span>
+        自製 vs 轉發：效果差距懸殊
+      </div>
+      <div style="font-size:12.5px;color:#555;line-height:1.8;">西台南（全自製）效率52.4 vs 花蓮（全轉發）效率0.7。土城7篇轉發效率3.9、民族多轉發效率12.4。<strong>單純轉發幾乎無法帶動互動</strong>，轉發可輔助但不能作為主要策略。</div>
+    </div>
+
+    <div style="background:#FFF8EC;border-radius:14px;padding:22px;border:1px solid #E8D8A0;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:15px;">⚠️</span>
+        粉絲成長疑似廣告驅動，需釐清
+      </div>
+      <div style="font-size:12.5px;color:#7A6020;line-height:1.8;">中台中（+237）與民族（+345，57→402）粉絲暴增，但互動水準落差極大。「粉絲暴增但互動偏低」通常是廣告投放導流，而非內容自然吸引。<strong>建議與行銷部門確認8月廣告投放情形</strong>，避免誤判競賽評比公平性。</div>
+    </div>
+
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION 8: 建議行動 ── -->
+<div class="section">
+  <div class="section-head">
+    <h2>下個月建議行動</h2>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:24px;">
+    <div style="background:#1E1E1C;border-radius:14px;padding:22px;color:#F5F4F1;">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:600;color:#8A9A8E;margin-bottom:8px;">01</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">全面推廣「創意內容優先」原則</div>
+      <div style="font-size:12px;color:#AAA;line-height:1.7;">以北市科（創意52%）、苗栗（創意60%）為範本，要求各經銷商創意類貼文占比不低於四成，並將點子王評選標準與創意內容產出量掛鉤，強化各店產出創意內容的誘因。</div>
+    </div>
+    <div style="background:#1E1E1C;border-radius:14px;padding:22px;color:#F5F4F1;">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:600;color:#B08968;margin-bottom:8px;">02</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">設定自製內容最低比例</div>
+      <div style="font-size:12px;color:#AAA;line-height:1.7;">針對花蓮、土城、民族等轉發依賴型，自製內容占比不得低於50%。總部可提供素材包（範本、腳本、拍攝指引）降低自製門檻，避免轉發型內容繼續拖累整體社群表現。</div>
+    </div>
+    <div style="background:#1E1E1C;border-radius:14px;padding:22px;color:#F5F4F1;">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:600;color:#8A7AA0;margin-bottom:8px;">03</div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;">釐清廣告驅動粉絲成長，分開評比</div>
+      <div style="font-size:12px;color:#AAA;line-height:1.7;">確認中台中、民族8月是否有廣告投放，若屬實，建議下月競賽中將「廣告驅動成長」與「自然內容成效」分開計分，確保競賽公平性，讓真正靠內容力的經銷商獲得應有肯定。</div>
+    </div>
+    <div style="background:#fff;border-radius:14px;padding:22px;border:1px solid #E8E5E0;">
+      <div style="font-size:12px;font-weight:700;color:#AAA;margin-bottom:10px;">各類型經銷商對應建議</div>
+      <div style="font-size:12px;color:#555;line-height:1.9;">
+        <div style="margin-bottom:6px;"><strong>轉發依賴型</strong>（花蓮、土城、民族）：設定自製門檻，參考北市科創意模式</div>
+        <div style="margin-bottom:6px;"><strong>公告佔比過高型</strong>（永康、太平、九如）：公告控制三成以內，導入小知識或創意類</div>
+        <div style="margin-bottom:6px;"><strong>發文頻率過低型</strong>（竹東1篇、松山1篇）：至少提升至每月4篇以上</div>
+        <div style="margin-bottom:6px;"><strong>粉絲流失型</strong>（板橋、太平）：檢視是否有負面觀感內容，加強留言互動</div>
+        <div><strong>低互動待加強型</strong>（員林、嘉義、頭份）：增加創意或互動引導，參考苗栗8/4手法</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</div><!-- /report -->
