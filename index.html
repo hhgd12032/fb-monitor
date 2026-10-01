@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -348,18 +349,34 @@ function App() {
         fbGet("fanRecords"),
         fbGet("posts"),
       ]);
-      // Support both {data:[...]} and direct array/object Firestore formats
-      function unwrap(d, fallback) {
-        if (!d) return fallback;
-        if (d.data !== undefined) return d.data;
-        return d;
+      // Firestore stores Firestore-safe objects only (no bare arrays).
+      // Old versions stored: doc "pages" = { pages: [...] }, doc "fanRecords" = { fanRecords: {...} }, doc "posts" = { posts: [...] }
+      // New version stores: doc "pages" = { data: [...] } etc.
+      // Support all variants.
+      function unwrapPages(d) {
+        if (!d) return null;
+        if (Array.isArray(d.data)) return d.data;       // new format
+        if (Array.isArray(d.pages)) return d.pages;     // old format
+        return null;
       }
-      const p = unwrap(pagesData, []);
-      const f = unwrap(fanData, {});
-      const po = unwrap(postsData, []);
-      if (Array.isArray(p)) setPages(p);
-      if (f && typeof f === "object" && !Array.isArray(f)) setFanRecords(f);
-      if (Array.isArray(po)) setPosts(po);
+      function unwrapFanRecords(d) {
+        if (!d) return null;
+        if (d.data && typeof d.data === "object" && !Array.isArray(d.data)) return d.data;
+        if (d.fanRecords && typeof d.fanRecords === "object") return d.fanRecords;
+        return null;
+      }
+      function unwrapPosts(d) {
+        if (!d) return null;
+        if (Array.isArray(d.data)) return d.data;
+        if (Array.isArray(d.posts)) return d.posts;
+        return null;
+      }
+      const p = unwrapPages(pagesData);
+      const f = unwrapFanRecords(fanData);
+      const po = unwrapPosts(postsData);
+      if (p) setPages(p);
+      if (f) setFanRecords(f);
+      if (po) setPosts(po);
       setAllLoaded(true);
     }
     loadData().catch(console.error);
@@ -372,17 +389,17 @@ function App() {
 
   const savePages = useCallback((next) => {
     setPages(next);
-    fbSet("pages", { data: next });
+    fbSet("pages", { pages: next, data: next });
   }, []);
 
   const saveFanRecords = useCallback((next) => {
     setFanRecords(next);
-    fbSet("fanRecords", { data: next });
+    fbSet("fanRecords", { fanRecords: next, data: next });
   }, []);
 
   const savePosts = useCallback((next) => {
     setPosts(next);
-    fbSet("posts", { data: next });
+    fbSet("posts", { posts: next, data: next });
   }, []);
 
   const pageMap = useMemo(() => {
@@ -2361,3 +2378,5 @@ root.render(<App />);
 </script>
 </body>
 </html>
+
+</body></html>
