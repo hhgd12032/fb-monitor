@@ -87,9 +87,43 @@ a{color:inherit;text-decoration:none;}
 .insight-card .ic-label{font-size:11px;color:#AAA;font-weight:500;margin-bottom:4px;}
 .insight-card .ic-val{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;}
 .insight-card .ic-name{font-size:12px;color:#666;margin-top:2px;}
+
+/* ── Scroll nav ── */
+html{scroll-padding-top:64px;}
+.scroll-nav{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(30,30,28,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transform:translateY(-100%);transition:transform .35s cubic-bezier(.16,1,.3,1);box-shadow:0 4px 16px rgba(0,0,0,.18);}
+.scroll-nav.visible{transform:translateY(0);}
+.scroll-nav-inner{max-width:960px;margin:0 auto;padding:10px 32px;display:flex;align-items:center;gap:4px;overflow-x:auto;scrollbar-width:none;}
+.scroll-nav-inner::-webkit-scrollbar{display:none;}
+.scroll-nav-brand{font-family:'Space Grotesk',sans-serif;font-size:11px;color:#8A9A8E;letter-spacing:1px;flex-shrink:0;margin-right:10px;white-space:nowrap;}
+.scroll-nav a{flex-shrink:0;font-size:12px;color:#BBB;padding:7px 13px;border-radius:20px;white-space:nowrap;transition:background .2s,color .2s;}
+.scroll-nav a:hover{color:#fff;background:rgba(255,255,255,.08);}
+.scroll-nav a.active{color:#fff;background:#3D6A63;}
+
+/* ── Scroll-reveal chart bars ── */
+svg.reveal-chart rect.bar-grow{transform-box:fill-box;transform-origin:left center;transform:scaleX(0);transition:transform 1s cubic-bezier(.16,1,.3,1);}
+svg.reveal-chart.in-view rect.bar-grow{transform:scaleX(1);}
+svg.reveal-chart text.bar-label{opacity:0;transition:opacity .6s ease;}
+svg.reveal-chart.in-view text.bar-label{opacity:1;}
+
+/* ── Count-up number highlight ── */
+[data-countup]{display:inline-block;}
 </style>
 </head>
 <body>
+<nav class="scroll-nav" id="scrollNav">
+  <div class="scroll-nav-inner">
+    <span class="scroll-nav-brand">2026/09 月報</span>
+    <a href="#fan-growth">粉絲成長</a>
+    <a href="#engagement-rank">互動排名</a>
+    <a href="#content-type">內容分佈</a>
+    <a href="#point-king">點子王</a>
+    <a href="#top5">互動TOP5</a>
+    <a href="#overview">整體總覽</a>
+    <a href="#highlights">本月亮點</a>
+    <a href="#strategy">策略觀察</a>
+    <a href="#actions">建議行動</a>
+  </div>
+</nav>
 <div class="report">
 
 <!-- ── COVER ── -->
@@ -98,15 +132,15 @@ a{color:inherit;text-decoration:none;}
   <h1>2026年9月<br/>粉絲團月報</h1>
   <div class="cover-sub">A / B / C 三組競賽成果 · 貼文表現分析 · 點子王清單</div>
   <div class="cover-stats">
-    <div class="cover-stat"><div class="n">23</div><div class="l">參賽經銷商</div></div>
-    <div class="cover-stat"><div class="n">209</div><div class="l">本月貼文</div></div>
-    <div class="cover-stat"><div class="n">9,827</div><div class="l">貼文互動總計</div></div>
-    <div class="cover-stat"><div class="n">12</div><div class="l">點子王貼文</div></div>
+    <div class="cover-stat"><div class="n" data-countup data-target="23">0</div><div class="l">參賽經銷商</div></div>
+    <div class="cover-stat"><div class="n" data-countup data-target="209">0</div><div class="l">本月貼文</div></div>
+    <div class="cover-stat"><div class="n" data-countup data-target="9827" data-comma="true">0</div><div class="l">貼文互動總計</div></div>
+    <div class="cover-stat"><div class="n" data-countup data-target="12">0</div><div class="l">點子王貼文</div></div>
   </div>
 </div>
 
 <!-- ── SECTION 1: 各組粉絲成長 ── -->
-<div class="section">
+<div class="section" id="fan-growth">
   <div class="section-head">
     <h2>粉絲數成長排名</h2>
     <span style="font-size:12px;color:#999;">9月整月增減數排名</span>
@@ -122,36 +156,36 @@ a{color:inherit;text-decoration:none;}
       </div>
     </div>
     <div class="chart-wrap" style="padding:16px 24px;">
-      <svg width="860" height="250" style="display:block;font-family:'Space Grotesk',sans-serif;">
+      <svg class="reveal-chart" width="860" height="250" style="display:block;font-family:'Space Grotesk',sans-serif;">
         <line x1="160" x2="820" y1="236" y2="236" stroke="#E8E5E0" stroke-width="1"/>
         <!-- 中台中 +272 -->
         <text x="155" y="28" text-anchor="end" font-size="12" fill="#333">中台中</text>
-        <rect x="160" y="14" width="640" height="18" rx="4" fill="#3D6A63"/>
-        <text x="808" y="28" font-size="12" fill="#2E6B50" font-weight="600">+272</text>
+        <rect class="bar-grow" style="transition-delay:.03s;" x="160" y="14" width="640" height="18" rx="4" fill="#3D6A63"/>
+        <text class="bar-label" x="808" y="28" font-size="12" fill="#2E6B50" font-weight="600" data-countup data-target="272" data-prefix="+">+0</text>
         <!-- 經國 +111 -->
         <text x="155" y="60" text-anchor="end" font-size="12" fill="#333">經國</text>
-        <rect x="160" y="46" width="261" height="18" rx="4" fill="#3D6A63" opacity=".75"/>
-        <text x="429" y="60" font-size="12" fill="#2E6B50" font-weight="600">+111</text>
+        <rect class="bar-grow" style="transition-delay:.09s;" x="160" y="46" width="261" height="18" rx="4" fill="#3D6A63" opacity=".75"/>
+        <text class="bar-label" x="429" y="60" font-size="12" fill="#2E6B50" font-weight="600" data-countup data-target="111" data-prefix="+">+0</text>
         <!-- 內湖 +38 -->
         <text x="155" y="92" text-anchor="end" font-size="12" fill="#333">內湖</text>
-        <rect x="160" y="78" width="89" height="18" rx="4" fill="#3D6A63" opacity=".5"/>
-        <text x="257" y="92" font-size="12" fill="#2E6B50" font-weight="600">+38</text>
+        <rect class="bar-grow" style="transition-delay:.15s;" x="160" y="78" width="89" height="18" rx="4" fill="#3D6A63" opacity=".5"/>
+        <text class="bar-label" x="257" y="92" font-size="12" fill="#2E6B50" font-weight="600" data-countup data-target="38" data-prefix="+">+0</text>
         <!-- 北市科 +36 -->
         <text x="155" y="124" text-anchor="end" font-size="12" fill="#333">北市科</text>
-        <rect x="160" y="110" width="85" height="18" rx="4" fill="#3D6A63" opacity=".45"/>
-        <text x="253" y="124" font-size="12" fill="#2E6B50" font-weight="600">+36</text>
+        <rect class="bar-grow" style="transition-delay:.21s;" x="160" y="110" width="85" height="18" rx="4" fill="#3D6A63" opacity=".45"/>
+        <text class="bar-label" x="253" y="124" font-size="12" fill="#2E6B50" font-weight="600" data-countup data-target="36" data-prefix="+">+0</text>
         <!-- 永康 +36 -->
         <text x="155" y="156" text-anchor="end" font-size="12" fill="#333">永康</text>
-        <rect x="160" y="142" width="85" height="18" rx="4" fill="#3D6A63" opacity=".45"/>
-        <text x="253" y="156" font-size="12" fill="#2E6B50" font-weight="600">+36</text>
+        <rect class="bar-grow" style="transition-delay:.27s;" x="160" y="142" width="85" height="18" rx="4" fill="#3D6A63" opacity=".45"/>
+        <text class="bar-label" x="253" y="156" font-size="12" fill="#2E6B50" font-weight="600" data-countup data-target="36" data-prefix="+">+0</text>
         <!-- 板橋 +32 -->
         <text x="155" y="188" text-anchor="end" font-size="12" fill="#333">板橋</text>
-        <rect x="160" y="174" width="75" height="18" rx="4" fill="#3D6A63" opacity=".4"/>
-        <text x="243" y="188" font-size="12" fill="#2E6B50" font-weight="600">+32</text>
+        <rect class="bar-grow" style="transition-delay:.33s;" x="160" y="174" width="75" height="18" rx="4" fill="#3D6A63" opacity=".4"/>
+        <text class="bar-label" x="243" y="188" font-size="12" fill="#2E6B50" font-weight="600" data-countup data-target="32" data-prefix="+">+0</text>
         <!-- 左營店 +20 -->
         <text x="155" y="220" text-anchor="end" font-size="12" fill="#333">左營店</text>
-        <rect x="160" y="206" width="47" height="18" rx="4" fill="#3D6A63" opacity=".35"/>
-        <text x="215" y="220" font-size="12" fill="#2E6B50" font-weight="600">+20</text>
+        <rect class="bar-grow" style="transition-delay:.39s;" x="160" y="206" width="47" height="18" rx="4" fill="#3D6A63" opacity=".35"/>
+        <text class="bar-label" x="215" y="220" font-size="12" fill="#2E6B50" font-weight="600" data-countup data-target="20" data-prefix="+">+0</text>
       </svg>
     </div>
     <table class="tbl">
@@ -232,7 +266,7 @@ a{color:inherit;text-decoration:none;}
 <hr class="divider"/>
 
 <!-- ── SECTION 2: 貼文互動排名 ── -->
-<div class="section">
+<div class="section" id="engagement-rank">
   <div class="section-head">
     <h2>貼文互動排名</h2>
     <span style="font-size:12px;color:#999;">讚＋留言＋分享，各組依總互動排序</span>
@@ -305,7 +339,7 @@ a{color:inherit;text-decoration:none;}
 <hr class="divider"/>
 
 <!-- ── SECTION 3: 貼文類型分析 ── -->
-<div class="section">
+<div class="section" id="content-type">
   <div class="section-head">
     <h2>各組貼文類型與內容分佈</h2>
     <span style="font-size:12px;color:#999;">自製 / 轉發 / AI · 內容標籤</span>
@@ -349,7 +383,7 @@ a{color:inherit;text-decoration:none;}
 <hr class="divider"/>
 
 <!-- ── SECTION 4: 點子王 ── -->
-<div class="section">
+<div class="section" id="point-king">
   <div class="section-head">
     <h2>⭐ 點子王貼文清單</h2>
     <span style="font-size:12px;color:#999;">9月共 12 篇</span>
@@ -471,7 +505,7 @@ a{color:inherit;text-decoration:none;}
 <hr class="divider"/>
 
 <!-- ── SECTION 4.5: TOP 5 互動貼文 ── -->
-<div class="section">
+<div class="section" id="top5">
   <div class="section-head">
     <h2>本月互動 TOP 5 貼文</h2>
     <span style="font-size:12px;color:#999;">單篇互動（讚＋留言＋分享）最高的5篇</span>
@@ -517,7 +551,7 @@ a{color:inherit;text-decoration:none;}
 <hr class="divider"/>
 
 <!-- ── SECTION 5: 各組整體表現 ── -->
-<div class="section">
+<div class="section" id="overview">
   <div class="section-head">
     <h2>各組整體表現總覽</h2>
     <span style="font-size:12px;color:#999;">發文數 · 互動 · 效率 · 點子王</span>
@@ -533,20 +567,20 @@ a{color:inherit;text-decoration:none;}
         <tr class="rank-1">
           <td><span style="background:#DDE5E2;color:#3D6A63;padding:2px 10px;border-radius:5px;font-weight:700;">A 組</span></td>
           <td class="r num">7</td><td class="r num">60</td>
-          <td class="r num">6,142</td><td class="r num pos">102.4</td>
-          <td class="r num pos">+545</td><td class="r num">⭐ 7</td>
+          <td class="r num">6,142</td><td class="r num pos"><span data-countup data-target="102.4" data-decimals="1">0</span></td>
+          <td class="r num pos"><span data-countup data-target="545" data-prefix="+">+0</span></td><td class="r num">⭐ 7</td>
         </tr>
         <tr>
           <td><span style="background:#EDE4D6;color:#7A5230;padding:2px 10px;border-radius:5px;font-weight:700;">B 組</span></td>
           <td class="r num">7</td><td class="r num">70</td>
-          <td class="r num">2,229</td><td class="r num">31.8</td>
-          <td class="r num pos">+181</td><td class="r num">⭐ 3</td>
+          <td class="r num">2,229</td><td class="r num"><span data-countup data-target="31.8" data-decimals="1">0</span></td>
+          <td class="r num pos"><span data-countup data-target="181" data-prefix="+">+0</span></td><td class="r num">⭐ 3</td>
         </tr>
         <tr>
           <td><span style="background:#E2DDE8;color:#4E3D6E;padding:2px 10px;border-radius:5px;font-weight:700;">C 組</span></td>
           <td class="r num">9</td><td class="r num">79</td>
-          <td class="r num">1,456</td><td class="r num neg">18.4</td>
-          <td class="r num pos">+110</td><td class="r num">⭐ 2</td>
+          <td class="r num">1,456</td><td class="r num neg"><span data-countup data-target="18.4" data-decimals="1">0</span></td>
+          <td class="r num pos"><span data-countup data-target="110" data-prefix="+">+0</span></td><td class="r num">⭐ 2</td>
         </tr>
       </tbody>
     </table>
@@ -571,7 +605,7 @@ a{color:inherit;text-decoration:none;}
 <hr class="divider"/>
 
 <!-- ── SECTION 6: 本月亮點經銷商 ── -->
-<div class="section">
+<div class="section" id="highlights">
   <div class="section-head">
     <h2>本月表現亮點</h2>
     <span style="font-size:12px;color:#999;">全體23家中最值得關注的3家</span>
@@ -588,11 +622,11 @@ a{color:inherit;text-decoration:none;}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
         <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;">365.2</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;" data-countup data-target="365.2" data-decimals="1">0</div>
           <div style="font-size:10px;color:#999;margin-top:2px;">均互動/篇</div>
         </div>
         <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;">+272</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;" data-countup data-target="272" data-prefix="+">+0</div>
           <div style="font-size:10px;color:#999;margin-top:2px;">粉絲淨增</div>
         </div>
       </div>
@@ -609,11 +643,11 @@ a{color:inherit;text-decoration:none;}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
         <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#7A5230;">146.6</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#7A5230;" data-countup data-target="146.6" data-decimals="1">0</div>
           <div style="font-size:10px;color:#999;margin-top:2px;">均互動/篇</div>
         </div>
         <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#7A5230;">+101</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#7A5230;" data-countup data-target="101" data-prefix="+">+0</div>
           <div style="font-size:10px;color:#999;margin-top:2px;">粉絲淨增</div>
         </div>
       </div>
@@ -630,11 +664,11 @@ a{color:inherit;text-decoration:none;}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
         <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;">85.2</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;" data-countup data-target="85.2" data-decimals="1">0</div>
           <div style="font-size:10px;color:#999;margin-top:2px;">均互動/篇</div>
         </div>
         <div style="background:#F5F4F1;border-radius:8px;padding:10px;text-align:center;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;">+36</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:#3D6A63;" data-countup data-target="36" data-prefix="+">+0</div>
           <div style="font-size:10px;color:#999;margin-top:2px;">粉絲淨增</div>
         </div>
       </div>
@@ -647,7 +681,7 @@ a{color:inherit;text-decoration:none;}
 <hr class="divider"/>
 
 <!-- ── SECTION 7: 策略觀察 ── -->
-<div class="section">
+<div class="section" id="strategy">
   <div class="section-head">
     <h2>貼文策略觀察</h2>
   </div>
@@ -691,7 +725,7 @@ a{color:inherit;text-decoration:none;}
 <hr class="divider"/>
 
 <!-- ── SECTION 8: 建議行動 ── -->
-<div class="section">
+<div class="section" id="actions">
   <div class="section-head">
     <h2>下個月建議行動</h2>
   </div>
@@ -727,5 +761,139 @@ a{color:inherit;text-decoration:none;}
 </div>
 
 </div><!-- /report -->
+
+<script>
+(function(){
+  "use strict";
+
+  function formatNumber(val, opts){
+    opts = opts || {};
+    var decimals = opts.decimals || 0;
+    var n = decimals ? val.toFixed(decimals) : Math.round(val).toString();
+    if(opts.comma){
+      var parts = n.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      n = parts.join('.');
+    }
+    return (opts.prefix || '') + n;
+  }
+
+  function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+  function animateCountUp(el){
+    var target = parseFloat(el.getAttribute('data-target'));
+    if(isNaN(target)) return;
+    var decimals = parseInt(el.getAttribute('data-decimals') || '0', 10);
+    var prefix = el.getAttribute('data-prefix') || '';
+    var comma = el.getAttribute('data-comma') === 'true';
+    var duration = 1100;
+    var start = null;
+
+    function step(ts){
+      if(start === null) start = ts;
+      var progress = Math.min((ts - start) / duration, 1);
+      var eased = easeOutCubic(progress);
+      var current = target * eased;
+      el.textContent = formatNumber(current, {decimals:decimals, prefix:prefix, comma:comma});
+      if(progress < 1){
+        requestAnimationFrame(step);
+      } else {
+        el.textContent = formatNumber(target, {decimals:decimals, prefix:prefix, comma:comma});
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function initCountUps(){
+    var els = document.querySelectorAll('[data-countup]');
+    if(!els.length) return;
+    if(!('IntersectionObserver' in window)){
+      els.forEach(animateCountUp);
+      return;
+    }
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          animateCountUp(entry.target);
+          obs.unobserve(entry.target);
+        }
+      });
+    }, {threshold:0.4});
+    els.forEach(function(el){ obs.observe(el); });
+  }
+
+  function initChartReveal(){
+    var charts = document.querySelectorAll('svg.reveal-chart');
+    if(!charts.length) return;
+    if(!('IntersectionObserver' in window)){
+      charts.forEach(function(c){ c.classList.add('in-view'); });
+      return;
+    }
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          entry.target.classList.add('in-view');
+          obs.unobserve(entry.target);
+        }
+      });
+    }, {threshold:0.3});
+    charts.forEach(function(c){ obs.observe(c); });
+  }
+
+  function initNav(){
+    var nav = document.getElementById('scrollNav');
+    var cover = document.querySelector('.cover');
+    if(!nav || !cover) return;
+
+    var threshold = cover.offsetHeight * 0.6;
+    function onScroll(){
+      if(window.scrollY > threshold){
+        nav.classList.add('visible');
+      } else {
+        nav.classList.remove('visible');
+      }
+    }
+    window.addEventListener('scroll', onScroll, {passive:true});
+    onScroll();
+
+    var links = Array.prototype.slice.call(nav.querySelectorAll('a'));
+    var sections = links.map(function(a){
+      return document.getElementById(a.getAttribute('href').slice(1));
+    });
+
+    if('IntersectionObserver' in window){
+      var navObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(entry){
+          var idx = sections.indexOf(entry.target);
+          if(idx === -1) return;
+          if(entry.isIntersecting){
+            links.forEach(function(a){ a.classList.remove('active'); });
+            links[idx].classList.add('active');
+          }
+        });
+      }, {rootMargin:'-40% 0px -50% 0px'});
+      sections.forEach(function(sec){ if(sec) navObs.observe(sec); });
+    }
+
+    links.forEach(function(a){
+      a.addEventListener('click', function(e){
+        var id = a.getAttribute('href').slice(1);
+        var target = document.getElementById(id);
+        if(!target) return;
+        e.preventDefault();
+        var navHeight = nav.offsetHeight || 56;
+        var top = target.getBoundingClientRect().top + window.pageYOffset - navHeight - 12;
+        window.scrollTo({top: top, behavior: 'smooth'});
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    initCountUps();
+    initChartReveal();
+    initNav();
+  });
+})();
+</script>
 </body>
 </html>
