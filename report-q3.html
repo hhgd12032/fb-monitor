@@ -84,6 +84,32 @@ h1,h2,h3{font-family:'Noto Sans TC',sans-serif;}
 tbody.rank-extra{display:none;}
 tbody.rank-extra.open{display:table-row-group;}
 
+/* ── Rank bar list (ranking + chart merged into one) ── */
+.rank-bars-head{display:grid;grid-template-columns:30px 84px 1fr 72px;gap:12px;padding:10px 18px 6px;font-size:.7rem;color:var(--gray-400);letter-spacing:.3px;}
+.rank-bars-head .r{text-align:right;}
+.rank-bars{display:flex;flex-direction:column;}
+.rank-row{display:grid;grid-template-columns:30px 84px 1fr 72px;align-items:center;gap:12px;padding:7px 18px;border-radius:8px;}
+.rank-row:hover{background:var(--surface);}
+.rank-row .rank-badge-sm{background:var(--surface);color:var(--gray-600);}
+.rank-row.top1 .rank-badge-sm{background:var(--accent,var(--red));color:var(--white);}
+.rank-row.top2 .rank-badge-sm{background:var(--accent,var(--red));color:var(--white);opacity:.78;}
+.rank-row.top3 .rank-badge-sm{background:var(--accent,var(--red));color:var(--white);opacity:.58;}
+.rank-name{font-size:.84rem;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-row.top1 .rank-name{font-weight:700;}
+.rank-track{height:10px;background:var(--surface);border-radius:6px;overflow:hidden;}
+.rank-fill{height:100%;border-radius:6px;background:var(--accent,var(--red));transform-origin:left center;transform:scaleX(0);transition:transform 1s cubic-bezier(.16,1,.3,1);opacity:.26;}
+.rank-bars.in-view .rank-fill{transform:scaleX(1);}
+.rank-row.top1 .rank-fill{opacity:1;}
+.rank-row.top2 .rank-fill{opacity:.74;}
+.rank-row.top3 .rank-fill{opacity:.52;}
+.rank-val{font-family:'Space Grotesk',sans-serif;font-size:.84rem;font-weight:600;text-align:right;color:var(--gray-600);white-space:nowrap;}
+.rank-row.top1 .rank-val{color:var(--accent,var(--red));font-weight:700;}
+.rank-row.top2 .rank-val,.rank-row.top3 .rank-val{color:var(--ink);}
+.rank-extra-rows{display:none;flex-direction:column;}
+.rank-extra-rows.open{display:flex;}
+.rank-toggle-wrap{border-top:1px solid var(--border);margin-top:2px;}
+@media (max-width:480px){.rank-bars-head,.rank-row{grid-template-columns:22px 60px 1fr 56px;gap:7px;padding-left:12px;padding-right:12px;}}
+
 /* ── Tags / pills ── */
 .tag-chip{display:inline-block;padding:2px 9px;border-radius:5px;font-size:.72rem;margin:1px;background:var(--surface);color:var(--gray-600);}
 .src-original{background:var(--blue-tint);color:var(--blue-dark);}
@@ -295,51 +321,92 @@ svg.reveal-chart.in-view rect.bar-grow-v{transform:scaleY(1);}
       <div class="group-badge red"><svg class="icon"><use href="#i-trend"/></svg></div>
       <div class="group-header-info"><h3>粉絲成長王排行</h3><p>依季度粉絲增減人數排序</p></div>
     </div>
-    <table class="tbl">
-      <thead><tr><th>排名</th><th>經銷商</th><th class="r">粉絲增減</th></tr></thead>
-      <tbody>
-        <tr class="rank-1"><td><span class="rank-badge-sm">1</span></td><td>中台中</td><td class="r num pos">+584</td></tr>
-        <tr><td><span class="rank-badge-sm">2</span></td><td>民族</td><td class="r num pos">+371</td></tr>
-        <tr><td><span class="rank-badge-sm">3</span></td><td>苗栗</td><td class="r num pos">+268</td></tr>
-        <tr><td><span class="rank-badge-sm">4</span></td><td>北市科</td><td class="r num pos">+198</td></tr>
-        <tr><td><span class="rank-badge-sm">5</span></td><td>經國</td><td class="r num pos">+142</td></tr>
-        <tr><td><span class="rank-badge-sm">6</span></td><td>北台中</td><td class="r num pos">+108</td></tr>
-        <tr><td><span class="rank-badge-sm">7</span></td><td>板橋</td><td class="r num pos">+85</td></tr>
-        <tr><td><span class="rank-badge-sm">8</span></td><td>左營店</td><td class="r num pos">+72</td></tr>
-        <tr><td><span class="rank-badge-sm">9</span></td><td>永康</td><td class="r num pos">+59</td></tr>
-        <tr><td><span class="rank-badge-sm">10</span></td><td>頭份</td><td class="r num pos">+57</td></tr>
-      </tbody>
-      <tbody class="rank-extra" id="extra-fan-growth">
-        <tr><td><span class="rank-badge-sm">11</span></td><td>內湖</td><td class="r num pos">+43</td></tr>
-        <tr><td><span class="rank-badge-sm">12</span></td><td>西台南</td><td class="r num pos">+23</td></tr>
-        <tr><td><span class="rank-badge-sm">13</span></td><td>員林</td><td class="r num pos">+18</td></tr>
-        <tr><td><span class="rank-badge-sm">14</span></td><td>松山</td><td class="r num pos">+16</td></tr>
-        <tr><td><span class="rank-badge-sm">15</span></td><td>九如</td><td class="r num pos">+15</td></tr>
-      </tbody>
-      <tfoot>
-        <tr class="rank-toggle-row"><td colspan="3">
-          <button class="rank-toggle" type="button" data-toggle="extra-fan-growth" aria-expanded="false">
-            <span class="btn-label">顯示第11–15名</span>
-            <svg class="icon chev"><use href="#i-chev"/></svg>
-          </button>
-        </td></tr>
-      </tfoot>
-    </table>
-  </div>
-
-  <div class="chart-wrap" style="padding:4px 0 24px;">
-    <svg class="reveal-chart" width="860" height="160" style="display:block;font-family:'Space Grotesk',sans-serif;">
-      <line x1="160" x2="820" y1="146" y2="146" stroke="var(--border)" stroke-width="1"/>
-      <text x="155" y="28" text-anchor="end" font-size="12" fill="#333">中台中</text>
-      <rect class="bar-grow" style="transition-delay:.03s;" x="160" y="14" width="640" height="18" rx="4" fill="#E4002B"/>
-      <text class="bar-label" x="808" y="28" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="584" data-prefix="+">+0</text>
-      <text x="155" y="78" text-anchor="end" font-size="12" fill="#333">民族</text>
-      <rect class="bar-grow" style="transition-delay:.12s;" x="160" y="64" width="407" height="18" rx="4" fill="#E4002B" opacity=".65"/>
-      <text class="bar-label" x="575" y="78" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="371" data-prefix="+">+0</text>
-      <text x="155" y="128" text-anchor="end" font-size="12" fill="#333">苗栗</text>
-      <rect class="bar-grow" style="transition-delay:.21s;" x="160" y="114" width="294" height="18" rx="4" fill="#E4002B" opacity=".45"/>
-      <text class="bar-label" x="462" y="128" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="268" data-prefix="+">+0</text>
-    </svg>
+    <div class="rank-bars-head"><div></div><div>經銷商</div><div></div><div class="r">粉絲增減</div></div>
+    <div class="rank-bars">
+      <div class="rank-row top1">
+        <div class="rank-badge-sm">1</div><div class="rank-name">中台中</div>
+        <div class="rank-track"><div class="rank-fill" style="width:100%;transition-delay:.02s;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="584">0</span></div>
+      </div>
+      <div class="rank-row top2">
+        <div class="rank-badge-sm">2</div><div class="rank-name">民族</div>
+        <div class="rank-track"><div class="rank-fill" style="width:63.5%;transition-delay:.05s;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="371">0</span></div>
+      </div>
+      <div class="rank-row top3">
+        <div class="rank-badge-sm">3</div><div class="rank-name">苗栗</div>
+        <div class="rank-track"><div class="rank-fill" style="width:45.9%;transition-delay:.08s;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="268">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">4</div><div class="rank-name">北市科</div>
+        <div class="rank-track"><div class="rank-fill" style="width:33.9%;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="198">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">5</div><div class="rank-name">經國</div>
+        <div class="rank-track"><div class="rank-fill" style="width:24.3%;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="142">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">6</div><div class="rank-name">北台中</div>
+        <div class="rank-track"><div class="rank-fill" style="width:18.5%;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="108">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">7</div><div class="rank-name">板橋</div>
+        <div class="rank-track"><div class="rank-fill" style="width:14.6%;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="85">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">8</div><div class="rank-name">左營店</div>
+        <div class="rank-track"><div class="rank-fill" style="width:12.3%;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="72">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">9</div><div class="rank-name">永康</div>
+        <div class="rank-track"><div class="rank-fill" style="width:10.1%;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="59">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">10</div><div class="rank-name">頭份</div>
+        <div class="rank-track"><div class="rank-fill" style="width:9.8%;"></div></div>
+        <div class="rank-val">+<span data-countup data-target="57">0</span></div>
+      </div>
+      <div class="rank-extra-rows" id="extra-fan-growth">
+        <div class="rank-row">
+          <div class="rank-badge-sm">11</div><div class="rank-name">內湖</div>
+          <div class="rank-track"><div class="rank-fill" style="width:7.4%;"></div></div>
+          <div class="rank-val">+<span data-countup data-target="43">0</span></div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">12</div><div class="rank-name">西台南</div>
+          <div class="rank-track"><div class="rank-fill" style="width:3.9%;"></div></div>
+          <div class="rank-val">+<span data-countup data-target="23">0</span></div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">13</div><div class="rank-name">員林</div>
+          <div class="rank-track"><div class="rank-fill" style="width:3.1%;"></div></div>
+          <div class="rank-val">+<span data-countup data-target="18">0</span></div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">14</div><div class="rank-name">松山</div>
+          <div class="rank-track"><div class="rank-fill" style="width:2.7%;"></div></div>
+          <div class="rank-val">+<span data-countup data-target="16">0</span></div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">15</div><div class="rank-name">九如</div>
+          <div class="rank-track"><div class="rank-fill" style="width:2.6%;"></div></div>
+          <div class="rank-val">+<span data-countup data-target="15">0</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="rank-toggle-wrap">
+      <button class="rank-toggle" type="button" data-toggle="extra-fan-growth" aria-expanded="false">
+        <span class="btn-label">顯示第11–15名</span>
+        <svg class="icon chev"><use href="#i-chev"/></svg>
+      </button>
+    </div>
   </div>
 
   <div class="dealer-grid">
@@ -417,51 +484,92 @@ svg.reveal-chart.in-view rect.bar-grow-v{transform:scaleY(1);}
       <div class="group-badge blue"><svg class="icon"><use href="#i-bars"/></svg></div>
       <div class="group-header-info"><h3>互動王（篇均互動數）排行</h3><p>總互動 ÷ 總篇數</p></div>
     </div>
-    <table class="tbl">
-      <thead><tr><th>排名</th><th>經銷商</th><th class="r">篇均互動</th></tr></thead>
-      <tbody>
-        <tr class="rank-1"><td><span class="rank-badge-sm">1</span></td><td>中台中</td><td class="r num">264.0</td></tr>
-        <tr><td><span class="rank-badge-sm">2</span></td><td>苗栗</td><td class="r num">197.0</td></tr>
-        <tr><td><span class="rank-badge-sm">3</span></td><td>左營店</td><td class="r num">125.5</td></tr>
-        <tr><td><span class="rank-badge-sm">4</span></td><td>北市科</td><td class="r num">94.8</td></tr>
-        <tr><td><span class="rank-badge-sm">5</span></td><td>經國</td><td class="r num">68.7</td></tr>
-        <tr><td><span class="rank-badge-sm">6</span></td><td>板橋</td><td class="r num">62.3</td></tr>
-        <tr><td><span class="rank-badge-sm">7</span></td><td>西台南</td><td class="r num">48.4</td></tr>
-        <tr><td><span class="rank-badge-sm">8</span></td><td>永康</td><td class="r num">30.6</td></tr>
-        <tr><td><span class="rank-badge-sm">9</span></td><td>東台南</td><td class="r num">30.0</td></tr>
-        <tr><td><span class="rank-badge-sm">10</span></td><td>北台中</td><td class="r num">28.7</td></tr>
-      </tbody>
-      <tbody class="rank-extra" id="extra-engagement-count">
-        <tr><td><span class="rank-badge-sm">11</span></td><td>桃園</td><td class="r num">25.2</td></tr>
-        <tr><td><span class="rank-badge-sm">12</span></td><td>內湖</td><td class="r num">24.0</td></tr>
-        <tr><td><span class="rank-badge-sm">13</span></td><td>新北汐止</td><td class="r num">21.0</td></tr>
-        <tr><td><span class="rank-badge-sm">14</span></td><td>新竹</td><td class="r num">18.6</td></tr>
-        <tr><td><span class="rank-badge-sm">15</span></td><td>九如</td><td class="r num">16.2</td></tr>
-      </tbody>
-      <tfoot>
-        <tr class="rank-toggle-row"><td colspan="3">
-          <button class="rank-toggle" type="button" data-toggle="extra-engagement-count" aria-expanded="false">
-            <span class="btn-label">顯示第11–15名</span>
-            <svg class="icon chev"><use href="#i-chev"/></svg>
-          </button>
-        </td></tr>
-      </tfoot>
-    </table>
-  </div>
-
-  <div class="chart-wrap" style="padding:4px 0 24px;">
-    <svg class="reveal-chart" width="860" height="160" style="display:block;font-family:'Space Grotesk',sans-serif;">
-      <line x1="160" x2="820" y1="146" y2="146" stroke="var(--border)" stroke-width="1"/>
-      <text x="155" y="28" text-anchor="end" font-size="12" fill="#333">中台中</text>
-      <rect class="bar-grow" style="transition-delay:.03s;" x="160" y="14" width="640" height="18" rx="4" fill="#13579E"/>
-      <text class="bar-label" x="808" y="28" font-size="12" fill="#0D3E72" font-weight="600" data-countup data-target="264.0" data-decimals="1">0</text>
-      <text x="155" y="78" text-anchor="end" font-size="12" fill="#333">苗栗</text>
-      <rect class="bar-grow" style="transition-delay:.12s;" x="160" y="64" width="477" height="18" rx="4" fill="#13579E" opacity=".7"/>
-      <text class="bar-label" x="645" y="78" font-size="12" fill="#0D3E72" font-weight="600" data-countup data-target="197.0" data-decimals="1">0</text>
-      <text x="155" y="128" text-anchor="end" font-size="12" fill="#333">左營店</text>
-      <rect class="bar-grow" style="transition-delay:.21s;" x="160" y="114" width="305" height="18" rx="4" fill="#13579E" opacity=".45"/>
-      <text class="bar-label" x="473" y="128" font-size="12" fill="#0D3E72" font-weight="600" data-countup data-target="125.5" data-decimals="1">0</text>
-    </svg>
+    <div class="rank-bars-head"><div></div><div>經銷商</div><div></div><div class="r">篇均互動</div></div>
+    <div class="rank-bars">
+      <div class="rank-row top1">
+        <div class="rank-badge-sm">1</div><div class="rank-name">中台中</div>
+        <div class="rank-track"><div class="rank-fill" style="width:100%;transition-delay:.02s;"></div></div>
+        <div class="rank-val"><span data-countup data-target="264.0" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-row top2">
+        <div class="rank-badge-sm">2</div><div class="rank-name">苗栗</div>
+        <div class="rank-track"><div class="rank-fill" style="width:74.6%;transition-delay:.05s;"></div></div>
+        <div class="rank-val"><span data-countup data-target="197.0" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-row top3">
+        <div class="rank-badge-sm">3</div><div class="rank-name">左營店</div>
+        <div class="rank-track"><div class="rank-fill" style="width:47.5%;transition-delay:.08s;"></div></div>
+        <div class="rank-val"><span data-countup data-target="125.5" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">4</div><div class="rank-name">北市科</div>
+        <div class="rank-track"><div class="rank-fill" style="width:35.9%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="94.8" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">5</div><div class="rank-name">經國</div>
+        <div class="rank-track"><div class="rank-fill" style="width:26.0%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="68.7" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">6</div><div class="rank-name">板橋</div>
+        <div class="rank-track"><div class="rank-fill" style="width:23.6%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="62.3" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">7</div><div class="rank-name">西台南</div>
+        <div class="rank-track"><div class="rank-fill" style="width:18.3%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="48.4" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">8</div><div class="rank-name">永康</div>
+        <div class="rank-track"><div class="rank-fill" style="width:11.6%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="30.6" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">9</div><div class="rank-name">東台南</div>
+        <div class="rank-track"><div class="rank-fill" style="width:11.4%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="30.0" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">10</div><div class="rank-name">北台中</div>
+        <div class="rank-track"><div class="rank-fill" style="width:10.9%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="28.7" data-decimals="1">0</span></div>
+      </div>
+      <div class="rank-extra-rows" id="extra-engagement-count">
+        <div class="rank-row">
+          <div class="rank-badge-sm">11</div><div class="rank-name">桃園</div>
+          <div class="rank-track"><div class="rank-fill" style="width:9.5%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="25.2" data-decimals="1">0</span></div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">12</div><div class="rank-name">內湖</div>
+          <div class="rank-track"><div class="rank-fill" style="width:9.1%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="24.0" data-decimals="1">0</span></div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">13</div><div class="rank-name">新北汐止</div>
+          <div class="rank-track"><div class="rank-fill" style="width:8.0%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="21.0" data-decimals="1">0</span></div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">14</div><div class="rank-name">新竹</div>
+          <div class="rank-track"><div class="rank-fill" style="width:7.0%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="18.6" data-decimals="1">0</span></div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">15</div><div class="rank-name">九如</div>
+          <div class="rank-track"><div class="rank-fill" style="width:6.1%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="16.2" data-decimals="1">0</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="rank-toggle-wrap">
+      <button class="rank-toggle" type="button" data-toggle="extra-engagement-count" aria-expanded="false">
+        <span class="btn-label">顯示第11–15名</span>
+        <svg class="icon chev"><use href="#i-chev"/></svg>
+      </button>
+    </div>
   </div>
 
   <div class="dealer-grid">
@@ -537,51 +645,92 @@ svg.reveal-chart.in-view rect.bar-grow-v{transform:scaleY(1);}
       <div class="group-badge ink"><svg class="icon"><use href="#i-percent"/></svg></div>
       <div class="group-header-info"><h3>互動王（篇均互動率）排行</h3><p>中位數互動 ÷ 粉絲數</p></div>
     </div>
-    <table class="tbl">
-      <thead><tr><th>排名</th><th>經銷商</th><th class="r">互動率</th></tr></thead>
-      <tbody>
-        <tr class="rank-1"><td><span class="rank-badge-sm">1</span></td><td>苗栗</td><td class="r num">18.32%</td></tr>
-        <tr><td><span class="rank-badge-sm">2</span></td><td>中台中</td><td class="r num">14.66%</td></tr>
-        <tr><td><span class="rank-badge-sm">3</span></td><td>西台南</td><td class="r num">13.07%</td></tr>
-        <tr><td><span class="rank-badge-sm">4</span></td><td>九如</td><td class="r num">9.87%</td></tr>
-        <tr><td><span class="rank-badge-sm">5</span></td><td>太平</td><td class="r num">3.97%</td></tr>
-        <tr><td><span class="rank-badge-sm">6</span></td><td>新竹</td><td class="r num">3.28%</td></tr>
-        <tr><td><span class="rank-badge-sm">7</span></td><td>竹北店</td><td class="r num">3.24%</td></tr>
-        <tr><td><span class="rank-badge-sm">8</span></td><td>員林</td><td class="r num">3.02%</td></tr>
-        <tr><td><span class="rank-badge-sm">9</span></td><td>北台中</td><td class="r num">2.74%</td></tr>
-        <tr><td><span class="rank-badge-sm">10</span></td><td>新北汐止</td><td class="r num">2.53%</td></tr>
-      </tbody>
-      <tbody class="rank-extra" id="extra-engagement-rate">
-        <tr><td><span class="rank-badge-sm">11</span></td><td>民族</td><td class="r num">2.45%</td></tr>
-        <tr><td><span class="rank-badge-sm">12</span></td><td>松山</td><td class="r num">2.39%</td></tr>
-        <tr><td><span class="rank-badge-sm">13</span></td><td>西台中</td><td class="r num">2.08%</td></tr>
-        <tr><td><span class="rank-badge-sm">14</span></td><td>永康</td><td class="r num">2.07%</td></tr>
-        <tr><td><span class="rank-badge-sm">15</span></td><td>板橋</td><td class="r num">2.01%</td></tr>
-      </tbody>
-      <tfoot>
-        <tr class="rank-toggle-row"><td colspan="3">
-          <button class="rank-toggle" type="button" data-toggle="extra-engagement-rate" aria-expanded="false">
-            <span class="btn-label">顯示第11–15名</span>
-            <svg class="icon chev"><use href="#i-chev"/></svg>
-          </button>
-        </td></tr>
-      </tfoot>
-    </table>
-  </div>
-
-  <div class="chart-wrap" style="padding:4px 0 24px;">
-    <svg class="reveal-chart" width="860" height="160" style="display:block;font-family:'Space Grotesk',sans-serif;">
-      <line x1="160" x2="820" y1="146" y2="146" stroke="var(--border)" stroke-width="1"/>
-      <text x="155" y="28" text-anchor="end" font-size="12" fill="#333">苗栗</text>
-      <rect class="bar-grow" style="transition-delay:.03s;" x="160" y="14" width="640" height="18" rx="4" fill="#1A1A1A"/>
-      <text class="bar-label" x="808" y="28" font-size="12" fill="#1A1A1A" font-weight="600" data-countup data-target="18.32" data-decimals="2">0</text>
-      <text x="155" y="78" text-anchor="end" font-size="12" fill="#333">中台中</text>
-      <rect class="bar-grow" style="transition-delay:.12s;" x="160" y="64" width="512" height="18" rx="4" fill="#1A1A1A" opacity=".7"/>
-      <text class="bar-label" x="680" y="78" font-size="12" fill="#1A1A1A" font-weight="600" data-countup data-target="14.66" data-decimals="2">0</text>
-      <text x="155" y="128" text-anchor="end" font-size="12" fill="#333">西台南</text>
-      <rect class="bar-grow" style="transition-delay:.21s;" x="160" y="114" width="457" height="18" rx="4" fill="#1A1A1A" opacity=".45"/>
-      <text class="bar-label" x="625" y="128" font-size="12" fill="#1A1A1A" font-weight="600" data-countup data-target="13.07" data-decimals="2">0</text>
-    </svg>
+    <div class="rank-bars-head"><div></div><div>經銷商</div><div></div><div class="r">互動率</div></div>
+    <div class="rank-bars">
+      <div class="rank-row top1">
+        <div class="rank-badge-sm">1</div><div class="rank-name">苗栗</div>
+        <div class="rank-track"><div class="rank-fill" style="width:100%;transition-delay:.02s;"></div></div>
+        <div class="rank-val"><span data-countup data-target="18.32" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-row top2">
+        <div class="rank-badge-sm">2</div><div class="rank-name">中台中</div>
+        <div class="rank-track"><div class="rank-fill" style="width:80.0%;transition-delay:.05s;"></div></div>
+        <div class="rank-val"><span data-countup data-target="14.66" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-row top3">
+        <div class="rank-badge-sm">3</div><div class="rank-name">西台南</div>
+        <div class="rank-track"><div class="rank-fill" style="width:71.3%;transition-delay:.08s;"></div></div>
+        <div class="rank-val"><span data-countup data-target="13.07" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">4</div><div class="rank-name">九如</div>
+        <div class="rank-track"><div class="rank-fill" style="width:53.9%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="9.87" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">5</div><div class="rank-name">太平</div>
+        <div class="rank-track"><div class="rank-fill" style="width:21.7%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="3.97" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">6</div><div class="rank-name">新竹</div>
+        <div class="rank-track"><div class="rank-fill" style="width:17.9%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="3.28" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">7</div><div class="rank-name">竹北店</div>
+        <div class="rank-track"><div class="rank-fill" style="width:17.7%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="3.24" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">8</div><div class="rank-name">員林</div>
+        <div class="rank-track"><div class="rank-fill" style="width:16.5%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="3.02" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">9</div><div class="rank-name">北台中</div>
+        <div class="rank-track"><div class="rank-fill" style="width:15.0%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="2.74" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-row">
+        <div class="rank-badge-sm">10</div><div class="rank-name">新北汐止</div>
+        <div class="rank-track"><div class="rank-fill" style="width:13.8%;"></div></div>
+        <div class="rank-val"><span data-countup data-target="2.53" data-decimals="2">0</span>%</div>
+      </div>
+      <div class="rank-extra-rows" id="extra-engagement-rate">
+        <div class="rank-row">
+          <div class="rank-badge-sm">11</div><div class="rank-name">民族</div>
+          <div class="rank-track"><div class="rank-fill" style="width:13.4%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="2.45" data-decimals="2">0</span>%</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">12</div><div class="rank-name">松山</div>
+          <div class="rank-track"><div class="rank-fill" style="width:13.0%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="2.39" data-decimals="2">0</span>%</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">13</div><div class="rank-name">西台中</div>
+          <div class="rank-track"><div class="rank-fill" style="width:11.4%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="2.08" data-decimals="2">0</span>%</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">14</div><div class="rank-name">永康</div>
+          <div class="rank-track"><div class="rank-fill" style="width:11.3%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="2.07" data-decimals="2">0</span>%</div>
+        </div>
+        <div class="rank-row">
+          <div class="rank-badge-sm">15</div><div class="rank-name">板橋</div>
+          <div class="rank-track"><div class="rank-fill" style="width:11.0%;"></div></div>
+          <div class="rank-val"><span data-countup data-target="2.01" data-decimals="2">0</span>%</div>
+        </div>
+      </div>
+    </div>
+    <div class="rank-toggle-wrap">
+      <button class="rank-toggle" type="button" data-toggle="extra-engagement-rate" aria-expanded="false">
+        <span class="btn-label">顯示第11–15名</span>
+        <svg class="icon chev"><use href="#i-chev"/></svg>
+      </button>
+    </div>
   </div>
 
   <div class="dealer-grid">
@@ -830,7 +979,7 @@ svg.reveal-chart.in-view rect.bar-grow-v{transform:scaleY(1);}
   }
 
   function initChartReveal(){
-    var charts = document.querySelectorAll('svg.reveal-chart');
+    var charts = document.querySelectorAll('svg.reveal-chart, .rank-bars');
     if(!charts.length) return;
     if(!('IntersectionObserver' in window)){
       charts.forEach(function(c){ c.classList.add('in-view'); });
