@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Honda 粉絲團季報 2026年Q3</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --red:#E4002B; --red-dark:#B5001F; --red-tint:#FDEAEE;
+  --blue:#13579E; --blue-dark:#0D3E72; --blue-tint:#E8F0FA;
+  --ink:#1A1A1A; --ink-tint:#ECECEC;
+  --gray-600:#6E6E6E; --gray-400:#9B9B9B; --border:#E6E6E6;
+  --surface:#F7F7F7; --white:#FFFFFF;
+}
+html{font-size:16px;scroll-padding-top:68px;}
+body{font-family:'Noto Sans TC',-apple-system,BlinkMacSystemFont,'PingFang TC','Helvetica Neue',Arial,sans-serif;background:var(--surface);color:var(--ink);font-size:1rem;line-height:1.7;-webkit-font-smoothing:antialiased;}
+a{color:inherit;text-decoration:none;}
+h1,h2,h3{font-family:'Noto Sans TC',sans-serif;}
+
+/* ── Icon sprite ── */
+.icon{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-4px;flex-shrink:0;}
+
+/* ── Layout ── */
+.report{max-width:1040px;margin:0 auto;padding:48px 24px 90px;}
+
+/* ── Cover ── */
+.cover{background:linear-gradient(155deg,#0A2F57 0%,#0D3E72 50%,#1A5086 100%);color:var(--white);border-radius:18px;padding:52px 44px 44px;margin-bottom:44px;position:relative;overflow:hidden;border-top:5px solid var(--red);}
+.cover::before{content:"";position:absolute;top:-70px;right:-60px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.10),transparent 70%);pointer-events:none;}
+.cover::after{content:"";position:absolute;bottom:-120px;left:8%;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(118,178,232,.28),transparent 70%);pointer-events:none;}
+.cover-label{font-size:.7rem;letter-spacing:2.5px;color:#9CC4EC;margin-bottom:16px;font-family:'Space Grotesk',sans-serif;text-transform:uppercase;position:relative;z-index:2;}
+.cover h1{font-size:30px;font-weight:900;line-height:1.3;margin-bottom:10px;letter-spacing:.2px;position:relative;z-index:2;}
+.cover-sub{font-size:.9rem;color:#B9D1E8;margin-bottom:30px;position:relative;z-index:2;}
+.cover-stats{display:flex;gap:36px;flex-wrap:wrap;position:relative;z-index:2;}
+.cover-stat .n{font-family:'Space Grotesk',sans-serif;font-size:27px;font-weight:700;color:var(--white);}
+.cover-stat .l{font-size:.72rem;color:#9CB8D6;margin-top:3px;}
+
+/* ── Section ── */
+.section{margin-bottom:52px;}
+.section-head{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+.section-head .icn{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.section-head .icn .icon{width:16px;height:16px;vertical-align:0;}
+.section-head .icn.red{background:var(--red-tint);color:var(--red);}
+.section-head .icn.blue{background:var(--blue-tint);color:var(--blue);}
+.section-head .icn.ink{background:var(--ink-tint);color:var(--ink);}
+.section-head h2{font-size:19px;font-weight:900;letter-spacing:.1px;}
+.section-head .sub{font-size:.78rem;color:var(--gray-400);width:100%;margin-top:-6px;padding-left:40px;}
+
+/* ── Note box (methodology footnote) ── */
+.note-box{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin:0 0 18px;}
+.note-box .icon{color:var(--gray-400);margin-top:1px;}
+.note-box p{font-size:.78rem;color:var(--gray-600);line-height:1.65;}
+
+/* ── Group block (ranking tables) ── */
+.group-block{background:var(--white);border-radius:14px;overflow:hidden;margin-bottom:22px;border:1px solid var(--border);}
+.group-header{padding:15px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);}
+.group-badge{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.group-badge .icon{width:15px;height:15px;vertical-align:0;}
+.group-badge.red{background:var(--red-tint);color:var(--red);}
+.group-badge.blue{background:var(--blue-tint);color:var(--blue);}
+.group-badge.ink{background:var(--ink-tint);color:var(--ink);}
+.group-header-info h3{font-size:.92rem;font-weight:700;}
+.group-header-info p{font-size:.76rem;color:var(--gray-400);margin-top:1px;}
+
+/* ── Table ── */
+.tbl{width:100%;border-collapse:collapse;}
+.tbl th{padding:10px 18px;text-align:left;font-size:.72rem;color:var(--gray-400);font-weight:500;letter-spacing:.3px;white-space:nowrap;}
+.tbl th.r,.tbl td.r{text-align:right;}
+.tbl td{padding:9px 18px;border-top:1px solid var(--border);font-size:.88rem;}
+.num{font-family:'Space Grotesk',sans-serif;font-weight:500;}
+.pos{color:var(--blue-dark);font-weight:700;}
+.neg{color:var(--red);font-weight:700;}
+.rank-1 td{font-weight:700;}
+.rank-badge-sm{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-family:'Space Grotesk',sans-serif;font-size:.72rem;font-weight:700;background:var(--surface);color:var(--gray-600);}
+.rank-1 .rank-badge-sm{background:var(--red);color:var(--white);}
+
+/* ── Rank toggle (collapsible 11–15) ── */
+.rank-toggle-row td{padding:0;border-top:1px solid var(--border);}
+.rank-toggle{width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;background:none;border:none;cursor:pointer;font-family:'Noto Sans TC',sans-serif;font-size:.8rem;color:var(--gray-600);transition:background .15s;}
+.rank-toggle:hover{background:var(--surface);}
+.rank-toggle .chev{width:14px;height:14px;transition:transform .25s ease;}
+.rank-toggle[aria-expanded="true"] .chev{transform:rotate(180deg);}
+tbody.rank-extra{display:none;}
+tbody.rank-extra.open{display:table-row-group;}
+
+/* ── Tags / pills ── */
+.tag-chip{display:inline-block;padding:2px 9px;border-radius:5px;font-size:.72rem;margin:1px;background:var(--surface);color:var(--gray-600);}
+.src-original{background:var(--blue-tint);color:var(--blue-dark);}
+.src-repost{background:var(--ink-tint);color:var(--gray-600);}
+.src-ai{background:var(--red-tint);color:var(--red-dark);}
+.pill-group{display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;font-size:.72rem;}
+.pill-red{background:var(--red-tint);color:var(--red);}
+.pill-blue{background:var(--blue-tint);color:var(--blue);}
+.pill-ink{background:var(--ink-tint);color:var(--ink);}
+
+/* ── Highlight text ── */
+.hl{font-weight:700;color:var(--ink);}
+.hl-pos{color:var(--blue-dark);font-weight:700;}
+.hl-warn{color:var(--red);font-weight:700;}
+.hl-u{font-weight:700;color:var(--ink);text-decoration:underline;text-decoration-color:var(--red);text-decoration-thickness:2px;text-underline-offset:3px;}
+
+/* ── Dealer analysis card ── */
+.dealer-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:8px;}
+.dealer-card{background:var(--white);border-radius:14px;padding:22px;border:1px solid var(--border);display:flex;flex-direction:column;}
+.dealer-card.full{padding:24px 26px;}
+.dealer-card .dc-head{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;}
+.dc-rank-badge{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.8rem;color:var(--gray-600);flex-shrink:0;}
+.dc-rank-badge.r1{background:var(--accent,var(--red));border-color:var(--accent,var(--red));color:var(--white);}
+.dc-rank-badge.r2{background:var(--accent-tint,var(--red-tint));border-color:transparent;color:var(--accent,var(--red));}
+.dealer-card .dc-name{font-size:.98rem;font-weight:900;}
+.dealer-card .dc-sub{font-size:.72rem;color:var(--gray-400);margin-top:2px;}
+.dc-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-bottom:14px;}
+.dc-stats .tile{background:var(--surface);border-radius:8px;padding:9px 6px;text-align:center;}
+.dc-stats .tile .tn{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--ink);}
+.dc-stats .tile .tl{font-size:.68rem;color:var(--gray-400);margin-top:2px;}
+.dc-body p{font-size:.84rem;line-height:1.75;color:#333;margin-bottom:9px;}
+.dc-body p:last-child{margin-bottom:0;}
+.dc-body b{color:var(--ink);}
+.dc-reco{background:var(--surface);border-radius:9px;padding:11px 13px;margin-top:12px;font-size:.78rem;line-height:1.7;color:#333;}
+.dc-reco b{color:var(--ink);}
+@media (max-width:900px){.dealer-grid{grid-template-columns:1fr;}}
+
+/* ── Overview intro card ── */
+.intro-card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:24px 26px;margin-bottom:22px;}
+.intro-card p{font-size:.92rem;line-height:1.8;color:#333;margin-bottom:10px;}
+.intro-card p:last-child{margin-bottom:0;}
+
+/* ── Chart ── */
+.chart-wrap{overflow-x:auto;padding:0 0 4px;}
+
+/* ── Divider ── */
+.divider{border:none;border-top:1px solid var(--border);margin:44px 0;}
+
+/* ── Insight box ── */
+.insight-grid{display:grid;gap:14px;margin-bottom:8px;}
+.insight-card{background:var(--white);border:1px solid var(--border);border-radius:12px;padding:16px 18px;border-left:3px solid var(--red);}
+.insight-card.blue{border-left-color:var(--blue);}
+.insight-card.ink{border-left-color:var(--ink);}
+.insight-card .ic-label{font-size:.72rem;color:var(--gray-400);font-weight:500;margin-bottom:5px;}
+.insight-card .ic-val{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;color:var(--ink);}
+.insight-card .ic-name{font-size:.76rem;color:var(--gray-600);margin-top:3px;}
+
+/* ── Action cards ── */
+.action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:6px;}
+.action-card{background:var(--ink);color:var(--white);border-radius:14px;padding:20px;}
+.action-card .num{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;margin-bottom:8px;display:block;}
+.action-card .t{font-size:.86rem;font-weight:700;margin-bottom:7px;}
+.action-card .d{font-size:.76rem;color:#A8A8A8;line-height:1.7;}
+@media (max-width:900px){.action-grid{grid-template-columns:1fr;}}
+
+/* ── Scroll nav ── */
+.scroll-nav{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--border);transform:translateY(-100%);transition:transform .3s cubic-bezier(.16,1,.3,1);}
+.scroll-nav.visible{transform:translateY(0);}
+.scroll-nav-inner{max-width:1040px;margin:0 auto;padding:10px 24px;display:flex;align-items:center;gap:4px;overflow-x:auto;scrollbar-width:none;}
+.scroll-nav-inner::-webkit-scrollbar{display:none;}
+.scroll-nav-brand{font-family:'Space Grotesk',sans-serif;font-size:.68rem;color:var(--red);font-weight:700;letter-spacing:.5px;flex-shrink:0;margin-right:10px;white-space:nowrap;}
+.scroll-nav a{flex-shrink:0;font-size:.8rem;color:var(--gray-600);padding:7px 13px;border-radius:20px;white-space:nowrap;transition:background .2s,color .2s;font-weight:500;}
+.scroll-nav a:hover{color:var(--ink);background:var(--surface);}
+.scroll-nav a.active{color:var(--white);background:var(--red);}
+
+/* ── Font-size control ── */
+.fs-control{position:fixed;bottom:22px;right:22px;z-index:1000;background:rgba(255,255,255,.96);border:1px solid var(--border);border-radius:22px;box-shadow:0 4px 18px rgba(0,0,0,.1);display:flex;padding:4px;backdrop-filter:blur(8px);}
+.fs-control button{font-family:'Noto Sans TC',sans-serif;font-size:12px;font-weight:700;color:var(--gray-600);background:none;border:none;border-radius:18px;padding:7px 13px;cursor:pointer;transition:background .15s,color .15s;}
+.fs-control button.active{background:var(--ink);color:var(--white);}
+
+/* ── Scroll-reveal chart bars ── */
+svg.reveal-chart rect.bar-grow{transform-box:fill-box;transform-origin:left center;transform:scaleX(0);transition:transform 1s cubic-bezier(.16,1,.3,1);}
+svg.reveal-chart.in-view rect.bar-grow{transform:scaleX(1);}
+svg.reveal-chart text.bar-label{opacity:0;transition:opacity .6s ease;}
+svg.reveal-chart.in-view text.bar-label{opacity:1;}
+svg.reveal-chart rect.bar-grow-v{transform-box:fill-box;transform-origin:bottom center;transform:scaleY(0);transition:transform 1s cubic-bezier(.16,1,.3,1);}
+svg.reveal-chart.in-view rect.bar-grow-v{transform:scaleY(1);}
+
+/* ── Count-up number highlight ── */
+[data-countup]{display:inline-block;}
+</style>
+</head>
+<body>
+
+<!-- ── Icon sprite (reused via <use>) ── -->
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></symbol>
+  <symbol id="i-bars" viewBox="0 0 24 24"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="18" y1="20" x2="18" y2="14"/></symbol>
+  <symbol id="i-percent" viewBox="0 0 24 24"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.3"/><circle cx="17.5" cy="17.5" r="2.3"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><line x1="4" y1="22" x2="4" y2="2"/><path d="M4 4h14l-3 5 3 5H4"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="8" r=".6" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
+</svg>
+
+<nav class="scroll-nav" id="scrollNav">
+  <div class="scroll-nav-inner">
+    <span class="scroll-nav-brand">Q3 2026</span>
+    <a href="#overview">季度總覽</a>
+    <a href="#fan-growth">粉絲成長王</a>
+    <a href="#engagement-count">互動數王</a>
+    <a href="#engagement-rate">互動率王</a>
+    <a href="#content-type">貼文類型效益</a>
+    <a href="#recommendations">下季建議</a>
+  </div>
+</nav>
+
+<div class="fs-control" id="fsControl">
+  <button data-size="14">小</button>
+  <button data-size="16" class="active">中</button>
+  <button data-size="18">大</button>
+</div>
+
+<div class="report">
+
+<!-- ── COVER ── -->
+<div class="cover">
+  <div class="cover-label">HONDA TAIWAN · 粉絲團競賽季報</div>
+  <h1>2026年 Q3（7–9月）<br/>粉絲團季度分析報告</h1>
+  <div class="cover-sub">28家經銷商參賽月份合計 · 粉絲成長王 / 互動王（數・率）/ 貼文策略總覽</div>
+  <div class="cover-stats">
+    <div class="cover-stat"><div class="n" data-countup data-target="28">0</div><div class="l">參賽經銷商</div></div>
+    <div class="cover-stat"><div class="n" data-countup data-target="544">0</div><div class="l">本季貼文</div></div>
+    <div class="cover-stat"><div class="n" data-countup data-target="25308" data-comma="true">0</div><div class="l">貼文互動總計</div></div>
+    <div class="cover-stat"><div class="n" data-countup data-target="2138" data-prefix="+" data-comma="true">+0</div><div class="l">粉絲淨增（全體）</div></div>
+  </div>
+</div>
+
+<!-- ── SECTION: 季度總覽 ── -->
+<div class="section" id="overview">
+  <div class="section-head">
+    <div class="icn red"><svg class="icon"><use href="#i-target"/></svg></div>
+    <h2>季度總覽</h2>
+    <div class="sub">7–9月全體表現摘要</div>
+  </div>
+
+  <div class="intro-card">
+    <p>本季28家經銷商合計發布<span class="hl">544篇貼文</span>、創造<span class="hl-pos">25,308次互動</span>，粉絲淨增<span class="hl-pos">+2,138人</span>；但篇均<span class="hl">46.5</span>與中位數<span class="hl">15.0</span>落差懸殊，顯示少數爆文或直播大幅拉高平均，<span class="hl-u">多數貼文的真實互動水準其實落在十幾次這個常態區間</span>。</p>
+    <p>月度走勢呈<span class="hl">V型回升</span>：互動量由7月8,669滑落至8月谷底6,812，9月強勢回升至9,827創本季新高，顯示下半季內容節奏與策略調整確有成效。</p>
+    <p>冠軍格局集中：<span class="hl-pos">中台中</span>與<span class="hl-pos">苗栗</span>同時入列粉絲成長、互動數、互動率三項排名前三，是本季唯一的「潛在三冠候選」，但兩者的粉絲成長幅度（<span class="hl-warn">+61.9%</span>、<span class="hl-warn">+44.7%</span>）與同樣入榜的<span class="hl-warn">民族（+650.9%）</span>均需進一步確認是否涉及廣告投放或活動導流，以維持評比公平。</p>
+  </div>
+
+  <div class="group-block">
+    <div class="group-header">
+      <div class="group-badge ink"><svg class="icon"><use href="#i-trend"/></svg></div>
+      <div class="group-header-info">
+        <h3>月度互動走勢（7–9月）</h3>
+        <p>總互動 7月8,669 → 8月6,812 → 9月9,827</p>
+      </div>
+    </div>
+    <div class="chart-wrap" style="padding:20px 20px 4px;">
+      <svg class="reveal-chart" width="100%" viewBox="0 0 900 240" preserveAspectRatio="xMinYMin meet" style="display:block;font-family:'Space Grotesk',sans-serif;max-width:680px;overflow:visible;">
+        <line x1="0" x2="900" y1="210" y2="210" stroke="var(--border)" stroke-width="1"/>
+        <rect class="bar-grow-v" x="90" y="57" width="110" height="153" rx="4" fill="#E4002B" opacity=".45"/>
+        <text class="bar-label" x="145" y="46" text-anchor="middle" font-size="16" font-weight="700" fill="#B5001F" data-countup data-target="8669" data-comma="true">0</text>
+        <text x="145" y="228" text-anchor="middle" font-size="12" fill="#6E6E6E">7月</text>
+        <rect class="bar-grow-v" x="395" y="90" width="110" height="120" rx="4" fill="#E4002B" opacity=".28"/>
+        <text class="bar-label" x="450" y="79" text-anchor="middle" font-size="16" font-weight="700" fill="#B5001F" data-countup data-target="6812" data-comma="true">0</text>
+        <text x="450" y="228" text-anchor="middle" font-size="12" fill="#6E6E6E">8月（谷底）</text>
+        <rect class="bar-grow-v" x="700" y="37" width="110" height="173" rx="4" fill="#E4002B"/>
+        <text class="bar-label" x="755" y="26" text-anchor="middle" font-size="16" font-weight="700" fill="#B5001F" data-countup data-target="9827" data-comma="true">0</text>
+        <text x="755" y="228" text-anchor="middle" font-size="12" fill="#6E6E6E">9月（季末高點）</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="insight-grid" style="grid-template-columns:repeat(3,1fr);">
+    <div class="insight-card">
+      <div class="ic-label">本季貼文互動總計</div>
+      <div class="ic-val" data-countup data-target="25308" data-comma="true">0</div>
+      <div class="ic-name">篇均 46.5 · 中位數 15.0</div>
+    </div>
+    <div class="insight-card blue">
+      <div class="ic-label">點子王貢獻</div>
+      <div class="ic-val" data-countup data-target="54">0</div>
+      <div class="ic-name">篇均互動 55.5（一般貼文 45.5）</div>
+    </div>
+    <div class="insight-card ink">
+      <div class="ic-label">全體粉絲淨增</div>
+      <div class="ic-val" data-countup data-target="2138" data-prefix="+" data-comma="true">+0</div>
+      <div class="ic-name">含疑似廣告驅動個案，需個別校正</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION: 粉絲成長王 ── -->
+<div class="section" id="fan-growth" style="--accent:var(--red);--accent-tint:var(--red-tint);">
+  <div class="section-head">
+    <div class="icn red"><svg class="icon"><use href="#i-trend"/></svg></div>
+    <h2>粉絲成長王 前三名分析</h2>
+    <div class="sub">依季度粉絲增減人數排名 · 完整排行與前三名解析</div>
+  </div>
+
+  <div class="group-block">
+    <div class="group-header">
+      <div class="group-badge red"><svg class="icon"><use href="#i-trend"/></svg></div>
+      <div class="group-header-info"><h3>粉絲成長王排行</h3><p>依季度粉絲增減人數排序</p></div>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>排名</th><th>經銷商</th><th class="r">粉絲增減</th></tr></thead>
+      <tbody>
+        <tr class="rank-1"><td><span class="rank-badge-sm">1</span></td><td>中台中</td><td class="r num pos">+584</td></tr>
+        <tr><td><span class="rank-badge-sm">2</span></td><td>民族</td><td class="r num pos">+371</td></tr>
+        <tr><td><span class="rank-badge-sm">3</span></td><td>苗栗</td><td class="r num pos">+268</td></tr>
+        <tr><td><span class="rank-badge-sm">4</span></td><td>北市科</td><td class="r num pos">+198</td></tr>
+        <tr><td><span class="rank-badge-sm">5</span></td><td>經國</td><td class="r num pos">+142</td></tr>
+        <tr><td><span class="rank-badge-sm">6</span></td><td>北台中</td><td class="r num pos">+108</td></tr>
+        <tr><td><span class="rank-badge-sm">7</span></td><td>板橋</td><td class="r num pos">+85</td></tr>
+        <tr><td><span class="rank-badge-sm">8</span></td><td>左營店</td><td class="r num pos">+72</td></tr>
+        <tr><td><span class="rank-badge-sm">9</span></td><td>永康</td><td class="r num pos">+59</td></tr>
+        <tr><td><span class="rank-badge-sm">10</span></td><td>頭份</td><td class="r num pos">+57</td></tr>
+      </tbody>
+      <tbody class="rank-extra" id="extra-fan-growth">
+        <tr><td><span class="rank-badge-sm">11</span></td><td>內湖</td><td class="r num pos">+43</td></tr>
+        <tr><td><span class="rank-badge-sm">12</span></td><td>西台南</td><td class="r num pos">+23</td></tr>
+        <tr><td><span class="rank-badge-sm">13</span></td><td>員林</td><td class="r num pos">+18</td></tr>
+        <tr><td><span class="rank-badge-sm">14</span></td><td>松山</td><td class="r num pos">+16</td></tr>
+        <tr><td><span class="rank-badge-sm">15</span></td><td>九如</td><td class="r num pos">+15</td></tr>
+      </tbody>
+      <tfoot>
+        <tr class="rank-toggle-row"><td colspan="3">
+          <button class="rank-toggle" type="button" data-toggle="extra-fan-growth" aria-expanded="false">
+            <span class="btn-label">顯示第11–15名</span>
+            <svg class="icon chev"><use href="#i-chev"/></svg>
+          </button>
+        </td></tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="chart-wrap" style="padding:4px 0 24px;">
+    <svg class="reveal-chart" width="860" height="160" style="display:block;font-family:'Space Grotesk',sans-serif;">
+      <line x1="160" x2="820" y1="146" y2="146" stroke="var(--border)" stroke-width="1"/>
+      <text x="155" y="28" text-anchor="end" font-size="12" fill="#333">中台中</text>
+      <rect class="bar-grow" style="transition-delay:.03s;" x="160" y="14" width="640" height="18" rx="4" fill="#E4002B"/>
+      <text class="bar-label" x="808" y="28" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="584" data-prefix="+">+0</text>
+      <text x="155" y="78" text-anchor="end" font-size="12" fill="#333">民族</text>
+      <rect class="bar-grow" style="transition-delay:.12s;" x="160" y="64" width="407" height="18" rx="4" fill="#E4002B" opacity=".65"/>
+      <text class="bar-label" x="575" y="78" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="371" data-prefix="+">+0</text>
+      <text x="155" y="128" text-anchor="end" font-size="12" fill="#333">苗栗</text>
+      <rect class="bar-grow" style="transition-delay:.21s;" x="160" y="114" width="294" height="18" rx="4" fill="#E4002B" opacity=".45"/>
+      <text class="bar-label" x="462" y="128" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="268" data-prefix="+">+0</text>
+    </svg>
+  </div>
+
+  <div class="dealer-grid">
+    <div class="dealer-card">
+      <div class="dc-head">
+        <div class="dc-rank-badge r1">1</div>
+        <div><span class="pill-group pill-red" style="margin-right:6px;">A組</span><span class="dc-name">中台中</span><div class="dc-sub">7月B・8月B・9月A · 粉絲944→1,528</div></div>
+      </div>
+      <div class="dc-stats">
+        <div class="tile"><div class="tn" data-countup data-target="584" data-prefix="+">+0</div><div class="tl">粉絲淨增</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="61.9" data-decimals="1">0</div><div class="tl">增幅 %</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="4488" data-comma="true">0</div><div class="tl">季度總互動</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="17">0</div><div class="tl">季度篇數</div></div>
+      </div>
+      <div class="dc-body">
+        <p><b>成功原因：</b>影片為主力，16篇均<span class="hl">253.6</span>，是全體影片均互動（54.1）的<span class="hl">4.7倍</span>；標籤以「其他」4篇均347.8、「新車宣傳」7篇均292.7最強。自製比例<span class="hl">88%</span>，零轉發。</p>
+        <p><b>點子王：</b>3篇均<span class="hl">158.0</span>，<span class="hl-warn">反低於一般貼文均286.7</span>——創意新穎但未必帶量。</p>
+        <p><b>比較：</b>最高單篇9/22佔16%，中位數接近平均，表現穩定。<span class="hl-warn">+584（61.9%）為全季最大增幅</span>，需查核廣告投放。</p>
+      </div>
+      <div class="dc-reco"><b>下季建議：</b>維持影片策略，提升點子王互動轉換率，並公開粉絲成長來源說明。</div>
+    </div>
+
+    <div class="dealer-card">
+      <div class="dc-head">
+        <div class="dc-rank-badge r2">2</div>
+        <div><span class="pill-group pill-ink" style="margin-right:6px;">C組</span><span class="dc-name">民族</span><div class="dc-sub">7月未參賽・8月C・9月C · 粉絲57→428</div></div>
+      </div>
+      <div class="dc-stats">
+        <div class="tile"><div class="tn" data-countup data-target="371" data-prefix="+">+0</div><div class="tl">粉絲淨增</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="650.9" data-decimals="1">0</div><div class="tl">增幅 %</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="861">0</div><div class="tl">季度總互動</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="54">0</div><div class="tl">季度篇數</div></div>
+      </div>
+      <div class="dc-body">
+        <p><b>成功原因：</b>圖片優於影片——36篇均18.1 vs 影片18篇均11.6；「新車宣傳」29篇均16.4量最大。</p>
+        <p><b>點子王：</b><span class="hl-warn">0篇</span>——本季前三名中唯一零點子王，成長全靠量與聲量。</p>
+        <p><b>比較：</b>轉發佔<span class="hl-warn">56%</span>，互動分散無爆文。<span class="hl-warn">+650.9%為全季最誇張增幅</span>，8月中短期暴增，強烈疑似廣告導流。</p>
+      </div>
+      <div class="dc-reco"><b>下季建議：</b>優先查核廣告來源；降低轉發比例，將發文量轉換為創意質量。</div>
+    </div>
+
+    <div class="dealer-card">
+      <div class="dc-head">
+        <div class="dc-rank-badge r3">3</div>
+        <div><span class="pill-group pill-blue" style="margin-right:6px;">B組</span><span class="dc-name">苗栗</span><div class="dc-sub">7月B・8月B・9月B · 粉絲600→868</div></div>
+      </div>
+      <div class="dc-stats">
+        <div class="tile"><div class="tn" data-countup data-target="268" data-prefix="+">+0</div><div class="tl">粉絲淨增</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="44.7" data-decimals="1">0</div><div class="tl">增幅 %</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="4137" data-comma="true">0</div><div class="tl">季度總互動</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="21">0</div><div class="tl">季度篇數</div></div>
+      </div>
+      <div class="dc-body">
+        <p><b>成功原因：</b>影片為主力，16篇均<span class="hl">219.8</span>，是全體影片均互動的4.1倍；「新車宣傳」13篇均212.0量質皆優。</p>
+        <p><b>點子王：</b>3篇均<span class="hl-pos">249.7</span>，<span class="hl-pos">高於一般貼文均188.2</span>——唯一創意即高效的案例。</p>
+        <p><b>比較：</b>轉發僅1篇，中位數與均值接近，整體穩定。+268（44.7%）增幅溫和，仍建議確認活動導流。</p>
+      </div>
+      <div class="dc-reco"><b>下季建議：</b>複製創意影片模式並擴大產出頻率，作B組示範案例。</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION: 互動王（篇均互動數） ── -->
+<div class="section" id="engagement-count" style="--accent:var(--blue);--accent-tint:var(--blue-tint);">
+  <div class="section-head">
+    <div class="icn blue"><svg class="icon"><use href="#i-bars"/></svg></div>
+    <h2>互動王（篇均互動數）前三名分析</h2>
+    <div class="sub">看絕對互動量 · 需至少3篇才列入排名</div>
+  </div>
+
+  <div class="group-block">
+    <div class="group-header">
+      <div class="group-badge blue"><svg class="icon"><use href="#i-bars"/></svg></div>
+      <div class="group-header-info"><h3>互動王（篇均互動數）排行</h3><p>總互動 ÷ 總篇數</p></div>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>排名</th><th>經銷商</th><th class="r">篇均互動</th></tr></thead>
+      <tbody>
+        <tr class="rank-1"><td><span class="rank-badge-sm">1</span></td><td>中台中</td><td class="r num">264.0</td></tr>
+        <tr><td><span class="rank-badge-sm">2</span></td><td>苗栗</td><td class="r num">197.0</td></tr>
+        <tr><td><span class="rank-badge-sm">3</span></td><td>左營店</td><td class="r num">125.5</td></tr>
+        <tr><td><span class="rank-badge-sm">4</span></td><td>北市科</td><td class="r num">94.8</td></tr>
+        <tr><td><span class="rank-badge-sm">5</span></td><td>經國</td><td class="r num">68.7</td></tr>
+        <tr><td><span class="rank-badge-sm">6</span></td><td>板橋</td><td class="r num">62.3</td></tr>
+        <tr><td><span class="rank-badge-sm">7</span></td><td>西台南</td><td class="r num">48.4</td></tr>
+        <tr><td><span class="rank-badge-sm">8</span></td><td>永康</td><td class="r num">30.6</td></tr>
+        <tr><td><span class="rank-badge-sm">9</span></td><td>東台南</td><td class="r num">30.0</td></tr>
+        <tr><td><span class="rank-badge-sm">10</span></td><td>北台中</td><td class="r num">28.7</td></tr>
+      </tbody>
+      <tbody class="rank-extra" id="extra-engagement-count">
+        <tr><td><span class="rank-badge-sm">11</span></td><td>桃園</td><td class="r num">25.2</td></tr>
+        <tr><td><span class="rank-badge-sm">12</span></td><td>內湖</td><td class="r num">24.0</td></tr>
+        <tr><td><span class="rank-badge-sm">13</span></td><td>新北汐止</td><td class="r num">21.0</td></tr>
+        <tr><td><span class="rank-badge-sm">14</span></td><td>新竹</td><td class="r num">18.6</td></tr>
+        <tr><td><span class="rank-badge-sm">15</span></td><td>九如</td><td class="r num">16.2</td></tr>
+      </tbody>
+      <tfoot>
+        <tr class="rank-toggle-row"><td colspan="3">
+          <button class="rank-toggle" type="button" data-toggle="extra-engagement-count" aria-expanded="false">
+            <span class="btn-label">顯示第11–15名</span>
+            <svg class="icon chev"><use href="#i-chev"/></svg>
+          </button>
+        </td></tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="chart-wrap" style="padding:4px 0 24px;">
+    <svg class="reveal-chart" width="860" height="160" style="display:block;font-family:'Space Grotesk',sans-serif;">
+      <line x1="160" x2="820" y1="146" y2="146" stroke="var(--border)" stroke-width="1"/>
+      <text x="155" y="28" text-anchor="end" font-size="12" fill="#333">中台中</text>
+      <rect class="bar-grow" style="transition-delay:.03s;" x="160" y="14" width="640" height="18" rx="4" fill="#13579E"/>
+      <text class="bar-label" x="808" y="28" font-size="12" fill="#0D3E72" font-weight="600" data-countup data-target="264.0" data-decimals="1">0</text>
+      <text x="155" y="78" text-anchor="end" font-size="12" fill="#333">苗栗</text>
+      <rect class="bar-grow" style="transition-delay:.12s;" x="160" y="64" width="477" height="18" rx="4" fill="#13579E" opacity=".7"/>
+      <text class="bar-label" x="645" y="78" font-size="12" fill="#0D3E72" font-weight="600" data-countup data-target="197.0" data-decimals="1">0</text>
+      <text x="155" y="128" text-anchor="end" font-size="12" fill="#333">左營店</text>
+      <rect class="bar-grow" style="transition-delay:.21s;" x="160" y="114" width="305" height="18" rx="4" fill="#13579E" opacity=".45"/>
+      <text class="bar-label" x="473" y="128" font-size="12" fill="#0D3E72" font-weight="600" data-countup data-target="125.5" data-decimals="1">0</text>
+    </svg>
+  </div>
+
+  <div class="dealer-grid">
+    <div class="dealer-card">
+      <div class="dc-head">
+        <div class="dc-rank-badge r1">1</div>
+        <div><span class="pill-group pill-red" style="margin-right:6px;">A組</span><span class="dc-name">中台中</span><div class="dc-sub">篇均264.0 · 中位數224.0</div></div>
+      </div>
+      <div class="dc-stats">
+        <div class="tile"><div class="tn" data-countup data-target="264.0" data-decimals="1">0</div><div class="tl">篇均互動</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="224.0" data-decimals="1">0</div><div class="tl">中位數</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="17">0</div><div class="tl">季度篇數</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="88">0</div><div class="tl">自製比例 %</div></div>
+      </div>
+      <div class="dc-body">
+        <p>動能與粉絲成長王相同：影片16篇均253.6為主力。<span class="hl">篇均264.0與中位數224.0差距不大</span>，代表沒有單篇暴衝拉高，整體穩定扎實。</p>
+        <p>點子王3篇均158.0仍低於一般貼文均286.7，顯示互動數王頭銜建立在穩定輸出優質影片，而非創意貼文爆量。</p>
+      </div>
+      <div class="dc-reco"><b>下季建議：</b>延續影片策略並提升點子王品質。</div>
+    </div>
+
+    <div class="dealer-card">
+      <div class="dc-head">
+        <div class="dc-rank-badge r2">2</div>
+        <div><span class="pill-group pill-blue" style="margin-right:6px;">B組</span><span class="dc-name">苗栗</span><div class="dc-sub">篇均197.0 · 中位數159.0</div></div>
+      </div>
+      <div class="dc-stats">
+        <div class="tile"><div class="tn" data-countup data-target="197.0" data-decimals="1">0</div><div class="tl">篇均互動</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="159.0" data-decimals="1">0</div><div class="tl">中位數</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="21">0</div><div class="tl">季度篇數</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="67">0</div><div class="tl">自製比例 %</div></div>
+      </div>
+      <div class="dc-body">
+        <p>影片16篇均219.8為主力。篇均197.0與中位數159.0落差略大，部分受7/1單篇795互動（交車類）拉抬，但整體仍穩定。</p>
+        <p>點子王3篇均249.7<span class="hl-pos">高於一般貼文均188.2</span>，是三家中唯一「創意即高效」的個案，可複製性高。</p>
+      </div>
+      <div class="dc-reco"><b>下季建議：</b>擴大創意影片產出頻率，鞏固量質齊發優勢。</div>
+    </div>
+
+    <div class="dealer-card">
+      <div class="dc-head">
+        <div class="dc-rank-badge r3">3</div>
+        <div><span class="pill-group pill-red" style="margin-right:6px;">A組</span><span class="dc-name">左營店</span><div class="dc-sub">篇均125.5 · 中位數25.0</div></div>
+      </div>
+      <div class="dc-stats">
+        <div class="tile"><div class="tn" data-countup data-target="125.5" data-decimals="1">0</div><div class="tl">篇均互動</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="25.0" data-decimals="1">0</div><div class="tl">中位數</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="15">0</div><div class="tl">季度篇數</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="47">0</div><div class="tl">最高單篇佔比 %</div></div>
+      </div>
+      <div class="dc-body">
+        <p><b>成功原因：</b>圖片最佳，12篇均<span class="hl">152.3</span>，是全體圖片均互動的4.6倍；影片僅3篇均18.3反而偏低。</p>
+        <p><b>點子王：</b><span class="hl-warn">0篇</span>。</p>
+        <p><b>比較：</b><span class="hl-warn">篇均125.5與中位數25.0落差懸殊</span>——9/15單篇佔<span class="hl-warn">47%</span>，扣除後其餘14篇均僅約71次，<span class="hl-u">由單篇爆文帶動</span>而非日常穩健。</p>
+      </div>
+      <div class="dc-reco"><b>下季建議：</b>分析9/15爆文手法並複製為SOP，提升日常基本互動水準。</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION: 互動王（篇均互動率） ── -->
+<div class="section" id="engagement-rate" style="--accent:var(--ink);--accent-tint:var(--ink-tint);">
+  <div class="section-head">
+    <div class="icn ink"><svg class="icon"><use href="#i-percent"/></svg></div>
+    <h2>互動王（篇均互動率）前三名分析</h2>
+    <div class="sub">中位數互動 ÷ 粉絲數 × 100% · 排除直播異常值、校正粉絲規模</div>
+  </div>
+
+  <div class="group-block">
+    <div class="group-header">
+      <div class="group-badge ink"><svg class="icon"><use href="#i-percent"/></svg></div>
+      <div class="group-header-info"><h3>互動王（篇均互動率）排行</h3><p>中位數互動 ÷ 粉絲數</p></div>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>排名</th><th>經銷商</th><th class="r">互動率</th></tr></thead>
+      <tbody>
+        <tr class="rank-1"><td><span class="rank-badge-sm">1</span></td><td>苗栗</td><td class="r num">18.32%</td></tr>
+        <tr><td><span class="rank-badge-sm">2</span></td><td>中台中</td><td class="r num">14.66%</td></tr>
+        <tr><td><span class="rank-badge-sm">3</span></td><td>西台南</td><td class="r num">13.07%</td></tr>
+        <tr><td><span class="rank-badge-sm">4</span></td><td>九如</td><td class="r num">9.87%</td></tr>
+        <tr><td><span class="rank-badge-sm">5</span></td><td>太平</td><td class="r num">3.97%</td></tr>
+        <tr><td><span class="rank-badge-sm">6</span></td><td>新竹</td><td class="r num">3.28%</td></tr>
+        <tr><td><span class="rank-badge-sm">7</span></td><td>竹北店</td><td class="r num">3.24%</td></tr>
+        <tr><td><span class="rank-badge-sm">8</span></td><td>員林</td><td class="r num">3.02%</td></tr>
+        <tr><td><span class="rank-badge-sm">9</span></td><td>北台中</td><td class="r num">2.74%</td></tr>
+        <tr><td><span class="rank-badge-sm">10</span></td><td>新北汐止</td><td class="r num">2.53%</td></tr>
+      </tbody>
+      <tbody class="rank-extra" id="extra-engagement-rate">
+        <tr><td><span class="rank-badge-sm">11</span></td><td>民族</td><td class="r num">2.45%</td></tr>
+        <tr><td><span class="rank-badge-sm">12</span></td><td>松山</td><td class="r num">2.39%</td></tr>
+        <tr><td><span class="rank-badge-sm">13</span></td><td>西台中</td><td class="r num">2.08%</td></tr>
+        <tr><td><span class="rank-badge-sm">14</span></td><td>永康</td><td class="r num">2.07%</td></tr>
+        <tr><td><span class="rank-badge-sm">15</span></td><td>板橋</td><td class="r num">2.01%</td></tr>
+      </tbody>
+      <tfoot>
+        <tr class="rank-toggle-row"><td colspan="3">
+          <button class="rank-toggle" type="button" data-toggle="extra-engagement-rate" aria-expanded="false">
+            <span class="btn-label">顯示第11–15名</span>
+            <svg class="icon chev"><use href="#i-chev"/></svg>
+          </button>
+        </td></tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <div class="chart-wrap" style="padding:4px 0 24px;">
+    <svg class="reveal-chart" width="860" height="160" style="display:block;font-family:'Space Grotesk',sans-serif;">
+      <line x1="160" x2="820" y1="146" y2="146" stroke="var(--border)" stroke-width="1"/>
+      <text x="155" y="28" text-anchor="end" font-size="12" fill="#333">苗栗</text>
+      <rect class="bar-grow" style="transition-delay:.03s;" x="160" y="14" width="640" height="18" rx="4" fill="#1A1A1A"/>
+      <text class="bar-label" x="808" y="28" font-size="12" fill="#1A1A1A" font-weight="600" data-countup data-target="18.32" data-decimals="2">0</text>
+      <text x="155" y="78" text-anchor="end" font-size="12" fill="#333">中台中</text>
+      <rect class="bar-grow" style="transition-delay:.12s;" x="160" y="64" width="512" height="18" rx="4" fill="#1A1A1A" opacity=".7"/>
+      <text class="bar-label" x="680" y="78" font-size="12" fill="#1A1A1A" font-weight="600" data-countup data-target="14.66" data-decimals="2">0</text>
+      <text x="155" y="128" text-anchor="end" font-size="12" fill="#333">西台南</text>
+      <rect class="bar-grow" style="transition-delay:.21s;" x="160" y="114" width="457" height="18" rx="4" fill="#1A1A1A" opacity=".45"/>
+      <text class="bar-label" x="625" y="128" font-size="12" fill="#1A1A1A" font-weight="600" data-countup data-target="13.07" data-decimals="2">0</text>
+    </svg>
+  </div>
+
+  <div class="dealer-grid">
+    <div class="dealer-card">
+      <div class="dc-head">
+        <div class="dc-rank-badge r1">1</div>
+        <div><span class="pill-group pill-blue" style="margin-right:6px;">B組</span><span class="dc-name">苗栗</span><div class="dc-sub">互動率18.32%（159.0÷868）</div></div>
+      </div>
+      <div class="dc-stats">
+        <div class="tile"><div class="tn" data-countup data-target="18.32" data-decimals="2">0</div><div class="tl">互動率 %</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="868">0</div><div class="tl">粉絲規模</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="159.0" data-decimals="1">0</div><div class="tl">中位數互動</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="21">0</div><div class="tl">季度篇數</div></div>
+      </div>
+      <div class="dc-body">
+        <p>粉絲規模較小（868），中位數互動高達159.0，校正粉絲基數後互動率<span class="hl-pos">全季最高（18.32%）</span>——優勢來自內容真正打動既有粉絲，而非粉絲基數堆砌。</p>
+      </div>
+      <div class="dc-reco"><b>下季建議：</b>延續創意影片策略，作B組效率型標竿案例。</div>
+    </div>
+
+    <div class="dealer-card">
+      <div class="dc-head">
+        <div class="dc-rank-badge r2">2</div>
+        <div><span class="pill-group pill-red" style="margin-right:6px;">A組</span><span class="dc-name">中台中</span><div class="dc-sub">互動率14.66%（224.0÷1,528）</div></div>
+      </div>
+      <div class="dc-stats">
+        <div class="tile"><div class="tn" data-countup data-target="14.66" data-decimals="2">0</div><div class="tl">互動率 %</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="1528">0</div><div class="tl">粉絲規模</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="224.0" data-decimals="1">0</div><div class="tl">中位數互動</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="17">0</div><div class="tl">季度篇數</div></div>
+      </div>
+      <div class="dc-body">
+        <p>粉絲規模較大（1,528），互動率仍居次席，<span class="hl-pos">證明高互動並非單純由粉絲基數堆出來的</span>——是本季唯一「大規模＋高效率」兼具的經銷商。</p>
+      </div>
+      <div class="dc-reco"><b>下季建議：</b>提升點子王轉換率，鞏固效率優勢。</div>
+    </div>
+
+    <div class="dealer-card">
+      <div class="dc-head">
+        <div class="dc-rank-badge r3">3</div>
+        <div><span class="pill-group pill-ink" style="margin-right:6px;">C組</span><span class="dc-name">西台南</span><div class="dc-sub">僅8月參賽 · 互動率13.07%</div></div>
+      </div>
+      <div class="dc-stats">
+        <div class="tile"><div class="tn" data-countup data-target="13.07" data-decimals="2">0</div><div class="tl">互動率 %</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="199">0</div><div class="tl">粉絲規模</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="26.0" data-decimals="1">0</div><div class="tl">中位數互動</div></div>
+        <div class="tile"><div class="tn" data-countup data-target="100">0</div><div class="tl">自製比例 %</div></div>
+      </div>
+      <div class="dc-body">
+        <p><b>成功原因：</b>10篇<span class="hl">全為影片</span>，均48.4；自製比例<span class="hl">100%</span>，零轉發零AI。</p>
+        <p><b>點子王：</b>0篇。</p>
+        <p><b>比較：</b>粉絲規模最小（199），顯示小而美也能靠效率勝出；惟最高單篇佔<span class="hl-warn">46%</span>，與左營店類似，<span class="hl-u">僅1個月10篇樣本，代表性需保留</span>。</p>
+      </div>
+      <div class="dc-reco"><b>下季建議：</b>鼓勵持續參賽累積樣本，增加新車宣傳與創意類影片。</div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION: 貼文類型效益 ── -->
+<div class="section" id="content-type">
+  <div class="section-head">
+    <div class="icn blue"><svg class="icon"><use href="#i-grid"/></svg></div>
+    <h2>貼文類型效益</h2>
+    <div class="sub">全體格式與內容標籤比較 · 少於3篇樣本不下結論</div>
+  </div>
+
+  <div class="group-block">
+    <div class="group-header">
+      <div class="group-badge blue"><svg class="icon"><use href="#i-bars"/></svg></div>
+      <div class="group-header-info"><h3>貼文形式效益</h3><p>直播2篇／影片324篇／圖片218篇</p></div>
+    </div>
+    <div style="padding:16px 20px 0;">
+      <div class="note-box">
+        <svg class="icon"><use href="#i-info"/></svg>
+        <p>形式為互斥分類（每篇僅計1種，三者合計＝544篇全季貼文）。「篇均互動」＝該形式所有貼文的總互動 ÷ 該形式篇數，用來比較「拍什麼形式」效益較高。</p>
+      </div>
+    </div>
+    <div class="chart-wrap" style="padding:4px 20px 20px;">
+      <svg class="reveal-chart" width="860" height="140" style="display:block;font-family:'Space Grotesk',sans-serif;">
+        <line x1="190" x2="820" y1="126" y2="126" stroke="var(--border)" stroke-width="1"/>
+        <text x="185" y="28" text-anchor="end" font-size="12" fill="#AAA">直播（n=2）</text>
+        <rect class="bar-grow" style="transition-delay:.03s;" x="190" y="14" width="630" height="18" rx="4" fill="#13579E" opacity=".25"/>
+        <text class="bar-label" x="828" y="28" font-size="12" fill="#AAA" font-weight="600" data-countup data-target="310.0" data-decimals="1">0</text>
+        <text x="185" y="68" text-anchor="end" font-size="12" fill="#333">影片（324篇）</text>
+        <rect class="bar-grow" style="transition-delay:.12s;" x="190" y="54" width="110" height="18" rx="4" fill="#13579E"/>
+        <text class="bar-label" x="308" y="68" font-size="12" fill="#0D3E72" font-weight="600" data-countup data-target="54.1" data-decimals="1">0</text>
+        <text x="185" y="108" text-anchor="end" font-size="12" fill="#333">圖片（218篇）</text>
+        <rect class="bar-grow" style="transition-delay:.21s;" x="190" y="94" width="67" height="18" rx="4" fill="#13579E" opacity=".6"/>
+        <text class="bar-label" x="265" y="108" font-size="12" fill="#0D3E72" font-weight="600" data-countup data-target="32.9" data-decimals="1">0</text>
+      </svg>
+    </div>
+    <div style="padding:0 20px 20px;font-size:.82rem;color:var(--gray-600);line-height:1.75;">直播篇均310.0雖最高，但僅2篇樣本遠低於3篇門檻，<span class="hl-u">不可作為結論依據</span>。影片324篇（佔59.6%貼文量）篇均<span class="hl">54.1</span>，是樣本量最大且優於全體平均（46.5）的主力形式；圖片218篇篇均32.9相對偏弱。</div>
+  </div>
+
+  <div class="group-block">
+    <div class="group-header">
+      <div class="group-badge red"><svg class="icon"><use href="#i-grid"/></svg></div>
+      <div class="group-header-info"><h3>內容標籤效益</h3><p>依篇均互動排序，共7類標籤</p></div>
+    </div>
+    <div style="padding:16px 20px 0;">
+      <div class="note-box">
+        <svg class="icon"><use href="#i-info"/></svg>
+        <p>內容標籤非互斥分類，單篇貼文可同時標註多個標籤（如「新車宣傳＋創意」），故各標籤篇數加總（573篇標記）會超過544篇總貼文數。「篇均互動」＝該標籤所有貼文的總互動 ÷ 該標籤篇數，用來比較「哪種內容主題」效益較高，少於3篇樣本僅供參考。</p>
+      </div>
+    </div>
+    <div class="chart-wrap" style="padding:4px 20px 20px;">
+      <svg class="reveal-chart" width="860" height="280" style="display:block;font-family:'Space Grotesk',sans-serif;">
+        <line x1="150" x2="820" y1="266" y2="266" stroke="var(--border)" stroke-width="1"/>
+        <text x="145" y="28" text-anchor="end" font-size="12" fill="#333">交車（20篇）</text>
+        <rect class="bar-grow" style="transition-delay:.03s;" x="150" y="14" width="670" height="18" rx="4" fill="#E4002B"/>
+        <text class="bar-label" x="828" y="28" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="97.0" data-decimals="1">0</text>
+        <text x="145" y="64" text-anchor="end" font-size="12" fill="#333">促銷（70篇）</text>
+        <rect class="bar-grow" style="transition-delay:.09s;" x="150" y="50" width="416" height="18" rx="4" fill="#E4002B" opacity=".82"/>
+        <text x="574" y="64" font-size="12" class="bar-label" fill="#B5001F" font-weight="600" data-countup data-target="60.3" data-decimals="1">0</text>
+        <text x="145" y="100" text-anchor="end" font-size="12" fill="#333">小知識（23篇）</text>
+        <rect class="bar-grow" style="transition-delay:.15s;" x="150" y="86" width="403" height="18" rx="4" fill="#E4002B" opacity=".65"/>
+        <text class="bar-label" x="561" y="100" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="58.5" data-decimals="1">0</text>
+        <text x="145" y="136" text-anchor="end" font-size="12" fill="#333">創意（87篇）</text>
+        <rect class="bar-grow" style="transition-delay:.21s;" x="150" y="122" width="347" height="18" rx="4" fill="#E4002B" opacity=".5"/>
+        <text class="bar-label" x="505" y="136" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="50.3" data-decimals="1">0</text>
+        <text x="145" y="172" text-anchor="end" font-size="12" fill="#333">其他（58篇）</text>
+        <rect class="bar-grow" style="transition-delay:.27s;" x="150" y="158" width="337" height="18" rx="4" fill="#E4002B" opacity=".42"/>
+        <text class="bar-label" x="495" y="172" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="48.8" data-decimals="1">0</text>
+        <text x="145" y="208" text-anchor="end" font-size="12" fill="#333">新車宣傳（220篇）</text>
+        <rect class="bar-grow" style="transition-delay:.33s;" x="150" y="194" width="305" height="18" rx="4" fill="#E4002B" opacity=".32"/>
+        <text class="bar-label" x="463" y="208" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="44.1" data-decimals="1">0</text>
+        <text x="145" y="244" text-anchor="end" font-size="12" fill="#333">公告（95篇）</text>
+        <rect class="bar-grow" style="transition-delay:.39s;" x="150" y="230" width="249" height="18" rx="4" fill="#E4002B" opacity=".22"/>
+        <text class="bar-label" x="407" y="244" font-size="12" fill="#B5001F" font-weight="600" data-countup data-target="36.1" data-decimals="1">0</text>
+      </svg>
+    </div>
+    <div style="padding:0 20px 20px;font-size:.82rem;color:var(--gray-600);line-height:1.75;">「交車」20篇篇均<span class="hl">97.0</span>最高，但多由個別高互動單篇帶動；「促銷」70篇均60.3、「小知識」23篇均58.5次之。「新車宣傳」220篇最大宗（佔40.4%貼文量），篇均44.1接近全體平均；「公告」95篇均36.1為七類最低。</div>
+  </div>
+
+  <div class="insight-grid" style="grid-template-columns:repeat(2,1fr);">
+    <div class="insight-card">
+      <div class="ic-label">點子王貼文（54篇）</div>
+      <div class="ic-val" data-countup data-target="55.5" data-decimals="1">0</div>
+      <div class="ic-name">篇均互動</div>
+    </div>
+    <div class="insight-card blue">
+      <div class="ic-label">一般貼文（490篇）</div>
+      <div class="ic-val" data-countup data-target="45.5" data-decimals="1">0</div>
+      <div class="ic-name">篇均互動</div>
+    </div>
+  </div>
+  <div style="font-size:.82rem;color:var(--gray-600);line-height:1.75;margin-top:14px;">點子王均互動55.5，高出一般貼文45.5約<span class="hl">22%</span>，顯示創意亮點貼文優於平均，但差距非壓倒性——一般貼文中也存在高效表現者（如左營店、西台南的單篇爆文）。從前三名的9篇點子王清單觀察，<span class="hl">8篇為影片格式</span>，標籤集中在「新車宣傳」與「創意」，單純「公告」或「促銷」幾乎不會入選點子王——<span class="hl-u">影片仍是創意內容的主要載體</span>。</div>
+</div>
+
+<hr class="divider"/>
+
+<!-- ── SECTION: 下季建議 ── -->
+<div class="section" id="recommendations">
+  <div class="section-head">
+    <div class="icn ink"><svg class="icon"><use href="#i-flag"/></svg></div>
+    <h2>下季建議</h2>
+    <div class="sub">前三名維持優勢・中後段改善方向・全體行動方針</div>
+  </div>
+
+  <div class="intro-card">
+    <p><b class="hl">前三名如何維持優勢：</b>延續影片與創意雙軸策略——中台中、苗栗應持續以影片為主力格式，並維持點子王的創意含量（苗栗點子王均249.7高於一般188.2，是唯一正向落差的案例）；同時公開說明粉絲成長來源，以維持評比透明度與公信力。</p>
+    <p><b class="hl">中後段經銷商改善方向：</b>複製小額高效模式，而非追求聲量——參考左營店、西台南「單篇帶動」的案例，分析其爆文手法並轉化為可複製的SOP；對發文量大但效率低的經銷商（如太平互動率僅3.97%），應優先檢視內容標籤配置，減少低效的轉發與公告比重。</p>
+  </div>
+
+  <div class="action-grid">
+    <div class="action-card">
+      <span class="num" style="color:#FF5C7A;">01</span>
+      <div class="t">廣告驅動與自然成長分開計分</div>
+      <div class="d">針對民族（+650.9%）、中台中（+61.9%）等粉絲暴增案例，要求各店申報廣告投放情形，避免評比失真。</div>
+    </div>
+    <div class="action-card">
+      <span class="num" style="color:#6FA8E0;">02</span>
+      <div class="t">以互動率取代互動數作主評比指標</div>
+      <div class="d">互動率已排除粉絲規模與直播異常值干擾，能更公平比較大小經銷商；苗栗、西台南證明小店也能靠效率勝出。</div>
+    </div>
+    <div class="action-card">
+      <span class="num" style="color:#D8D8D8;">03</span>
+      <div class="t">設定每月至少1篇創意內容門檻</div>
+      <div class="d">點子王均互動（55.5）高於一般貼文（45.5），但左營店、民族、西台南等多家本季點子王掛零，應設每月最低產出門檻。</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /report -->
+
+<script>
+(function(){
+  "use strict";
+
+  function formatNumber(val, opts){
+    opts = opts || {};
+    var decimals = opts.decimals || 0;
+    var n = decimals ? val.toFixed(decimals) : Math.round(val).toString();
+    if(opts.comma){
+      var parts = n.split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      n = parts.join('.');
+    }
+    return (opts.prefix || '') + n;
+  }
+
+  function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+
+  function animateCountUp(el){
+    var target = parseFloat(el.getAttribute('data-target'));
+    if(isNaN(target)) return;
+    var decimals = parseInt(el.getAttribute('data-decimals') || '0', 10);
+    var prefix = el.getAttribute('data-prefix') || '';
+    var comma = el.getAttribute('data-comma') === 'true';
+    var duration = 1100;
+    var start = null;
+
+    function step(ts){
+      if(start === null) start = ts;
+      var progress = Math.min((ts - start) / duration, 1);
+      var eased = easeOutCubic(progress);
+      var current = target * eased;
+      el.textContent = formatNumber(current, {decimals:decimals, prefix:prefix, comma:comma});
+      if(progress < 1){
+        requestAnimationFrame(step);
+      } else {
+        el.textContent = formatNumber(target, {decimals:decimals, prefix:prefix, comma:comma});
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function initCountUps(){
+    var els = document.querySelectorAll('[data-countup]');
+    if(!els.length) return;
+    if(!('IntersectionObserver' in window)){
+      els.forEach(animateCountUp);
+      return;
+    }
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          animateCountUp(entry.target);
+          obs.unobserve(entry.target);
+        }
+      });
+    }, {threshold:0.4});
+    els.forEach(function(el){ obs.observe(el); });
+  }
+
+  function initChartReveal(){
+    var charts = document.querySelectorAll('svg.reveal-chart');
+    if(!charts.length) return;
+    if(!('IntersectionObserver' in window)){
+      charts.forEach(function(c){ c.classList.add('in-view'); });
+      return;
+    }
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(entry){
+        if(entry.isIntersecting){
+          entry.target.classList.add('in-view');
+          obs.unobserve(entry.target);
+        }
+      });
+    }, {threshold:0.3});
+    charts.forEach(function(c){ obs.observe(c); });
+  }
+
+  function initNav(){
+    var nav = document.getElementById('scrollNav');
+    var cover = document.querySelector('.cover');
+    if(!nav || !cover) return;
+
+    var threshold = cover.offsetHeight * 0.6;
+    function onScroll(){
+      if(window.scrollY > threshold){
+        nav.classList.add('visible');
+      } else {
+        nav.classList.remove('visible');
+      }
+    }
+    window.addEventListener('scroll', onScroll, {passive:true});
+    onScroll();
+
+    var links = Array.prototype.slice.call(nav.querySelectorAll('a'));
+    var sections = links.map(function(a){
+      return document.getElementById(a.getAttribute('href').slice(1));
+    });
+
+    if('IntersectionObserver' in window){
+      var navObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(entry){
+          var idx = sections.indexOf(entry.target);
+          if(idx === -1) return;
+          if(entry.isIntersecting){
+            links.forEach(function(a){ a.classList.remove('active'); });
+            links[idx].classList.add('active');
+          }
+        });
+      }, {rootMargin:'-40% 0px -50% 0px'});
+      sections.forEach(function(sec){ if(sec) navObs.observe(sec); });
+    }
+
+    links.forEach(function(a){
+      a.addEventListener('click', function(e){
+        var id = a.getAttribute('href').slice(1);
+        var target = document.getElementById(id);
+        if(!target) return;
+        e.preventDefault();
+        var navHeight = nav.offsetHeight || 56;
+        var top = target.getBoundingClientRect().top + window.pageYOffset - navHeight - 12;
+        window.scrollTo({top: top, behavior: 'smooth'});
+      });
+    });
+  }
+
+  function initRankToggles(){
+    var buttons = document.querySelectorAll('.rank-toggle');
+    buttons.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-toggle');
+        var tbody = document.getElementById(id);
+        if(!tbody) return;
+        var isOpen = tbody.classList.contains('open');
+        tbody.classList.toggle('open', !isOpen);
+        btn.setAttribute('aria-expanded', String(!isOpen));
+        btn.querySelector('.btn-label').textContent = isOpen ? '顯示第11–15名' : '收合';
+      });
+    });
+  }
+
+  function initFontSizeControl(){
+    var control = document.getElementById('fsControl');
+    if(!control) return;
+    var buttons = control.querySelectorAll('button');
+    buttons.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var size = btn.getAttribute('data-size');
+        document.documentElement.style.fontSize = size + 'px';
+        buttons.forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    initCountUps();
+    initChartReveal();
+    initNav();
+    initRankToggles();
+    initFontSizeControl();
+  });
+})();
+</script>
+</body>
+</html>
