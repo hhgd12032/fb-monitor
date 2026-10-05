@@ -66,6 +66,7 @@ const { useState, useEffect, useMemo, useCallback, useRef } = React;
    - pages: [{id, name, category, url}]
    - fanRecords: { [pageId]: [{id, date, count}] }   // 每月可多筆，各自綁日期
    - posts: [{id, pageId, url, likes, comments, shares, type, date, month}]
+   - events: [{id, title, type, start, end, note, createdAt}]  // 官方活動（全體共用）
    ============================================================ */
 
 const STORAGE_KEYS = {
@@ -73,6 +74,7 @@ const STORAGE_KEYS = {
   FAN_RECORDS: "fbmonitor:fanrecords",
   POSTS: "fbmonitor:posts",
   GROUP_RECORDS: "fbmonitor:grouprecords",
+  EVENTS: "fbmonitor:events",
 };
 
 const POST_TYPES = [
@@ -281,11 +283,12 @@ function App() {
   const [fanRecords, setFanRecords, persistFanRecords, frLoaded] = useStoredState(STORAGE_KEYS.FAN_RECORDS, {});
   const [posts, setPosts, persistPosts, postsLoaded] = useStoredState(STORAGE_KEYS.POSTS, []);
   const [groupRecords, setGroupRecords, persistGroupRecords, grLoaded] = useStoredState(STORAGE_KEYS.GROUP_RECORDS, {});
+  const [events, setEvents, persistEvents, evLoaded] = useStoredState(STORAGE_KEYS.EVENTS, []);
 
   const [view, setView] = useState("input"); // input | report | trend | pages
   const [month, setMonth] = useState(nowMonth());
   const [toast, setToast] = useState(null);
-  const allLoaded = pagesLoaded && frLoaded && postsLoaded && grLoaded;
+  const allLoaded = pagesLoaded && frLoaded && postsLoaded && grLoaded && evLoaded;
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -311,6 +314,11 @@ function App() {
     setGroupRecords(next);
     persistGroupRecords(next);
   }, [persistGroupRecords, setGroupRecords]);
+
+  const saveEvents = useCallback((next) => {
+    setEvents(next);
+    persistEvents(next);
+  }, [persistEvents, setEvents]);
 
   // visiblePages excludes hidden pages — used by all views except PagesView
   const visiblePages = useMemo(() => pages.filter((p) => !p.hidden), [pages]);
@@ -354,6 +362,8 @@ function App() {
             savePosts={savePosts}
             fanRecords={fanRecords}
             saveFanRecords={saveFanRecords}
+            events={events}
+            saveEvents={saveEvents}
             month={month}
             setMonth={setMonth}
             showToast={showToast}
@@ -365,19 +375,20 @@ function App() {
             posts={posts}
             fanRecords={fanRecords}
             groupRecords={groupRecords}
+            events={events}
             month={month}
             setMonth={setMonth}
             showToast={showToast}
           />
         )}
         {view === "trend" && (
-          <TrendView pages={pages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords} />
+          <TrendView pages={pages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords} events={events} />
         )}
         {view === "settings" && (
           <SettingsView
-            pages={pages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords}
+            pages={pages} fanRecords={fanRecords} posts={posts} groupRecords={groupRecords} events={events}
             savePages={savePages} saveFanRecords={saveFanRecords} savePosts={savePosts}
-            saveGroupRecords={saveGroupRecords} showToast={showToast}
+            saveGroupRecords={saveGroupRecords} saveEvents={saveEvents} showToast={showToast}
           />
         )}
       </main>
@@ -1200,8 +1211,8 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
 }
 
 /* ============================================================ Input view ============================================================ */
-function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month, setMonth, showToast }) {
-  const [tab, setTab] = useState("posts"); // posts | fans
+function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events, saveEvents, month, setMonth, showToast }) {
+  const [tab, setTab] = useState("posts"); // posts | fans | events
   const [selectedPageId, setSelectedPageId] = useState(pages[0]?.id || "");
   const [draft, setDraft] = useState({ url: "", views: "", likes: "", comments: "", shares: "", source: "original", format: "image", star: false, tags: [], date: "" });
   const urlRef = useRef(null);
@@ -1458,9 +1469,16 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
           粉絲人數
           <span style={{ ...styles.segBadge, ...(tab === "fans" ? styles.segBadgeActive : {}) }}>{totalFanEntriesThisMonth}</span>
         </button>
+        <button style={{ ...styles.segBtn, ...(tab === "events" ? styles.segBtnActive : {}) }} onClick={() => setTab("events")}>
+          <Icon name="calendar" size={16} />
+          官方活動
+          <span style={{ ...styles.segBadge, ...(tab === "events" ? styles.segBadgeActive : {}) }}>{eventsInMonths(events, [month]).length}</span>
+        </button>
       </div>
 
-      {pages.length === 0 ? (
+      {tab === "events" ? (
+        <EventsPanel events={events} saveEvents={saveEvents} month={month} showToast={showToast} />
+      ) : pages.length === 0 ? (
         <div style={styles.card}>
           <EmptyState text="請先到「粉絲團清單」新增粉絲團，才能開始輸入資料。" />
         </div>
@@ -1843,6 +1861,146 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, month,
   );
 }
 
+/* ============================================================ 官方活動（本月輸入 → 官方活動分頁） ============================================================ */
+function EventsPanel({ events, saveEvents, month, showToast }) {
+  const blank = { title: "", type: "season", start: `${month}-01`, end: "", note: "" };
+  const [draft, setDraft] = useState(blank);
+  const [editingId, setEditingId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+
+  useEffect(() => { if (!editingId) setDraft((d) => ({ ...d, start: `${month}-01`, end: "" })); }, [month]);
+
+  const list = useMemo(() => eventsInMonths(events, [month]), [events, month]);
+  const daysInMonth = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+
+  const submit = () => {
+    if (!draft.title.trim()) { showToast("請輸入活動名稱"); return; }
+    if (!draft.start) { showToast("請選擇日期"); return; }
+    const end = draft.end && draft.end > draft.start ? draft.end : "";
+    if (editingId) {
+      saveEvents(events.map((e) => (e.id === editingId ? { ...e, ...draft, title: draft.title.trim(), end } : e)));
+      showToast("已更新官方活動");
+    } else {
+      saveEvents([...(events || []), { id: uid(), ...draft, title: draft.title.trim(), end, createdAt: Date.now() }]);
+      showToast("已新增官方活動");
+    }
+    setEditingId(null);
+    setDraft({ ...blank, type: draft.type, start: draft.start });
+  };
+
+  const startEdit = (e) => { setEditingId(e.id); setDraft({ title: e.title, type: e.type, start: e.start, end: e.end || "", note: e.note || "" }); };
+  const cancelEdit = () => { setEditingId(null); setDraft(blank); };
+
+  // month timeline geometry: day d → % position
+  const pos = (date) => {
+    if (date < `${month}-01`) return 0;
+    if (date > `${month}-${String(daysInMonth).padStart(2, "0")}`) return 100;
+    return ((Number(date.slice(8, 10)) - 1) / daysInMonth) * 100;
+  };
+  const lanes = [];
+  const placed = list.map((e) => {
+    const l = pos(e.start);
+    const r = Math.max(pos(eventEnd(e)) + 100 / daysInMonth, l + Math.min(e.title.length * 1.2 + 1.6, 15)); // keep room for the label
+    let lane = lanes.findIndex((end) => end <= l);
+    if (lane < 0) { lane = lanes.length; lanes.push(r); } else lanes[lane] = r;
+    return { e, l, w: Math.max(r - l, 100 / daysInMonth), lane };
+  });
+
+  return (
+    <>
+      {pendingDelete && (
+        <ConfirmDialog title="刪除官方活動" message={`確定要刪除「${pendingDelete.title}」嗎？`}
+          onConfirm={() => { saveEvents(events.filter((e) => e.id !== pendingDelete.id)); setPendingDelete(null); showToast("已刪除"); }}
+          onCancel={() => setPendingDelete(null)} />
+      )}
+
+      <div style={styles.card}>
+        <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
+          記錄 Honda 官方的季節檔期、節慶、新車發表日、促銷活動。這是全體經銷商共用的時間軸，會顯示在「趨勢總覽 → 單月貼文明細」圖表上，並自動帶入月報／季報的 AI 提示詞。單日活動只填開始日期；檔期活動再加上結束日期。
+        </p>
+        <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "2fr 1fr 1fr" }}>
+          <Field label="活動名稱">
+            <input style={styles.input} value={draft.title} placeholder="例如：中秋節、CR-V 新車發表"
+              onChange={(e) => setDraft({ ...draft, title: e.target.value })} onKeyDown={(e) => e.key === "Enter" && submit()} />
+          </Field>
+          <Field label="開始日期">
+            <input type="date" style={styles.input} value={draft.start} onChange={(e) => setDraft({ ...draft, start: e.target.value })} />
+          </Field>
+          <Field label="結束日期（檔期才填）">
+            <input type="date" style={styles.input} value={draft.end} min={draft.start} onChange={(e) => setDraft({ ...draft, end: e.target.value })} />
+          </Field>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 14, marginTop: 12, alignItems: "end" }}>
+          <Field label="類型">
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {EVENT_TYPES.map((t) => {
+                const on = draft.type === t.value;
+                return (
+                  <button key={t.value} type="button" onClick={() => setDraft({ ...draft, type: t.value })}
+                    style={{ ...styles.chipBtn, display: "inline-flex", alignItems: "center", gap: 6, ...(on ? { background: "#fff", borderColor: t.color, color: "#3A3A38", fontWeight: 600, boxShadow: `inset 0 0 0 1px ${t.color}` } : {}) }}>
+                    <span style={{ width: 9, height: 9, borderRadius: 2, background: t.color }} />{t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+          <Field label="備註（選填）">
+            <input style={styles.input} value={draft.note} placeholder="例如：全台展間同步、官方廣告投放期間" onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+          </Field>
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <button style={styles.primaryBtn} onClick={submit}><Icon name={editingId ? "save" : "plus"} size={16} />{editingId ? "儲存修改" : "新增活動"}</button>
+          {editingId && <button style={styles.secondaryBtn} onClick={cancelEdit}>取消修改</button>}
+        </div>
+      </div>
+
+      <div style={styles.card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: "#3A3A38" }}>{monthLabel(month)} 活動時間軸</div>
+          <div style={{ fontSize: 12, color: "#A6A096" }}>共 {list.length} 項</div>
+        </div>
+        {list.length === 0 ? <EmptyState text="這個月還沒有官方活動紀錄。" /> : (
+          <>
+            <div style={{ position: "relative", height: lanes.length * 30 + 26, background: "#F7F4EE", borderRadius: 10, overflow: "hidden" }}>
+              {[1, 8, 15, 22, 29].filter((d) => d <= daysInMonth).map((d) => (
+                <div key={d} style={{ position: "absolute", left: `${((d - 1) / daysInMonth) * 100}%`, top: 0, bottom: 0, borderLeft: "1px dashed #E0DACE" }}>
+                  <span style={{ position: "absolute", bottom: 4, left: 4, fontSize: 10.5, color: "#A6A096", whiteSpace: "nowrap" }}>{d}日</span>
+                </div>
+              ))}
+              {placed.map(({ e, l, w, lane }) => (
+                <div key={e.id} onClick={() => startEdit(e)} title={`${e.title}｜${eventRangeLabel(e)}${e.note ? "｜" + e.note : ""}`}
+                  style={{ position: "absolute", left: `${Math.min(l, 88)}%`, width: `${w}%`, minWidth: Math.min(e.title.length * 12 + 16, 150), top: 6 + lane * 30, height: 24, borderRadius: 6, cursor: "pointer",
+                    background: eventType(e.type).color, color: "#fff", fontSize: 11.5, padding: "3px 7px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {e.title}
+                </div>
+              ))}
+            </div>
+            <table style={{ ...styles.table, marginTop: 14 }}>
+              <thead><tr>
+                <th style={styles.th}>日期</th><th style={styles.th}>活動</th><th style={styles.th}>類型</th><th style={styles.th}>備註</th><th style={{ ...styles.th, width: 80 }} />
+              </tr></thead>
+              <tbody>
+                {list.map((e) => (
+                  <tr key={e.id} style={{ ...styles.tr, ...(editingId === e.id ? { background: "#FBF5EC" } : {}) }}>
+                    <td style={{ ...styles.td, fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap" }}>{e.start}{eventEnd(e) !== e.start && <span style={{ color: "#A6A096" }}> ~ {eventEnd(e).slice(5)}</span>}</td>
+                    <td style={{ ...styles.td, fontWeight: 500 }}>{e.title}</td>
+                    <td style={styles.td}><span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: eventType(e.type).color }} />{eventType(e.type).label}</span></td>
+                    <td style={{ ...styles.td, color: "#7A7568", fontSize: 12.5 }}>{e.note || "—"}</td>
+                    <td style={{ ...styles.td, whiteSpace: "nowrap" }}>
+                      <button style={styles.iconBtn} onClick={() => startEdit(e)} title="修改"><Icon name="edit" size={15} /></button>
+                      <button style={styles.iconBtn} onClick={() => setPendingDelete(e)} title="刪除"><Icon name="trash" size={15} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 function TypeTag({ type }) {
   const t = POST_TYPES.find((x) => x.value === type) || POST_TYPES[3];
   return (
@@ -1889,7 +2047,7 @@ function FormatTag({ format }) {
 }
 
 /* ============================================================ Report view ============================================================ */
-function MonthReportView({ pages, posts, fanRecords, groupRecords, month, setMonth, showToast, modeSwitch }) {
+function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month, setMonth, showToast, modeSwitch }) {
   const monthPosts = useMemo(() => posts.filter((p) => p.month === month), [posts, month]);
   const pageMap = useMemo(() => {
     const m = {};
@@ -2131,6 +2289,14 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, month, setMon
       lines.push("");
     }
 
+    // ── Official events this month ──
+    const mEvents = eventsInMonths(events, [month]);
+    if (mEvents.length > 0) {
+      lines.push(`【本月官方活動 共 ${mEvents.length} 項】（請一併觀察活動期間前後的發文與互動是否有變化）`);
+      mEvents.forEach((e) => lines.push(`  ${e.start}${eventEnd(e) !== e.start ? "～" + eventEnd(e) : ""}　${eventType(e.type).label}：${e.title}${e.note ? `（${e.note}）` : ""}`));
+      lines.push("");
+    }
+
     // ── Top posts for reference ──
     const topPosts = [...monthPosts].sort((a, b) => engagement(b) - engagement(a)).slice(0, 5);
     lines.push("【本月互動 TOP 5 貼文】");
@@ -2278,6 +2444,17 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, month, setMon
 
   return (
     <div style={styles.viewWrap}>
+      <Anchor id="m-top" />
+      <FloatNav topId="m-top" items={[
+        { id: "m-growth", label: "粉絲成長排名", icon: "users" },
+        { id: "m-posts", label: "貼文互動排名", icon: "trend" },
+        { id: "m-star", label: "點子王貼文", icon: "spark" },
+        ...(activeGroup === "" ? [
+          { id: "m-content", label: "內容分佈", icon: "chart" },
+          { id: "m-toplike", label: "最高讚 TOP10", icon: "heart" },
+          { id: "m-ai", label: "AI 月報", icon: "edit" },
+        ] : []),
+      ]} />
       <Header title="月報表" subtitle="當月各項監測指標總覽">
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           {modeSwitch}
@@ -2300,6 +2477,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, month, setMon
         <StatCard icon="spark" label="本月貼文紀錄數" value={totals.postCount.toLocaleString()} />
       </div>
 
+      <Anchor id="m-growth" />
       <SectionTitle icon="users" title="粉絲人數成長排名 · 貼文互動排名" />
 
       {/* Group tab selector */}
@@ -2388,6 +2566,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, month, setMon
         )}
       </div>
 
+      <Anchor id="m-posts" />
       {/* Post engagement ranking — all posts for this group, sorted by engagement */}
       <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
         <div style={{ padding: "12px 18px", borderBottom: "1px solid #E6E1D6", fontSize: 13, color: "#7A7568", fontWeight: 500 }}>
@@ -2401,6 +2580,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, month, setMon
       </div>
 
       {/* 點子王列表 — 全體和A/B/C都顯示 */}
+      <Anchor id="m-star" />
       <SectionTitle icon="spark" title={`⭐ 點子王貼文${activeGroup ? `（${activeGroup} 組）` : "（全體）"}`} />
       {starPostsFiltered.length > 0 ? (
         <PostRankTable posts={starPostsFiltered} pageMap={pageMap} metric={engagement} metricLabel="互動總計" showGroup={activeGroup === "" && hasGroupData} getGroup={getGroup} collapsible />
@@ -2413,6 +2593,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, month, setMon
       {/* 最高讚 TOP10 + AI 提示詞 — 只在「全體」分頁顯示 */}
       {activeGroup === "" && (
         <>
+          <Anchor id="m-content" />
           <SectionTitle icon="chart" title="各粉絲團貼文內容分佈" />
           <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
@@ -2473,9 +2654,11 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, month, setMon
             </div>
           </div>
 
+          <Anchor id="m-toplike" />
           <SectionTitle icon="heart" title="本月最高讚貼文 TOP 10" />
           <PostRankTable posts={topLiked} pageMap={pageMap} metric="likes" metricLabel="讚數" showGroup={hasGroupData} getGroup={getGroup} />
 
+          <Anchor id="m-ai" />
           <SectionTitle icon="edit" title="AI 月報分析提示詞" />
           <div style={styles.card}>
             <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0, marginBottom: 16 }}>
@@ -2641,7 +2824,7 @@ function ChampionCard({ title, row, valueText, sub, onClick }) {
   );
 }
 
-function QuarterReportView({ pages, posts, fanRecords, groupRecords, showToast, modeSwitch }) {
+function QuarterReportView({ pages, posts, fanRecords, groupRecords, events, showToast, modeSwitch }) {
   // every month that has any data
   const allMonths = useMemo(() => {
     const set = new Set(posts.map((p) => p.month));
@@ -2735,7 +2918,7 @@ function QuarterReportView({ pages, posts, fanRecords, groupRecords, showToast, 
           const me = mp.map(engagement);
           return { m, n: mp.length, total: me.reduce((a, b) => a + b, 0), med: mp.length ? median(me) : null };
         });
-        return { page, groupsByMonth, eligible, byMonth, n, total, avg, med, fanBase, first, last, diff, pct, rate, stars: pp.filter((p) => p.star).length, liveCount };
+        return { page, pp, prof: postProfile(pp), groupsByMonth, eligible, byMonth, n, total, avg, med, fanBase, first, last, diff, pct, rate, stars: pp.filter((p) => p.star).length, liveCount };
       })
       .filter(Boolean);
   }, [pages, posts, fanRecords, groupRecords, qMonths, groupFilter, participantsOnly, excludeLive, excludedIds]);
@@ -2748,6 +2931,39 @@ function QuarterReportView({ pages, posts, fanRecords, groupRecords, showToast, 
   const notQualified = rows.filter((r) => r.n > 0 && r.n < minPosts);
   const avgRows = useMemo(() => [...qualified].sort((a, b) => b.avg - a.avg || b.med - a.med), [qualified]);
   const rateRows = useMemo(() => qualified.filter((r) => r.rate != null).sort((a, b) => b.rate - a.rate), [qualified]);
+
+  const overall = useMemo(() => postProfile(rows.flatMap((r) => r.pp)), [rows]);
+  const monthStats = useMemo(() => qMonths.map((m) => {
+    const list = rows.flatMap((r) => r.byMonth.filter((b) => b.m === m));
+    return { m, n: list.reduce((s, b) => s + b.n, 0), total: list.reduce((s, b) => s + b.total, 0) };
+  }), [rows, qMonths]);
+  const qEvents = useMemo(() => eventsInMonths(events, qMonths), [events, qMonths]);
+
+  /* ---- AI prompt & report ---- */
+  const [qPrompt, setQPrompt] = useState("");
+  const [qCopied, setQCopied] = useState(false);
+  const [qAiResult, setQAiResult] = useState("");
+  const qMdRef = useRef(null);
+  const scopeLabel = `${groupFilter ? `只看 ${groupFilter} 組月份` : participantsOnly ? "只計參賽月份" : "全部月份"}${excludeLive ? "・已排除直播" : ""}・互動王至少 ${minPosts} 篇`;
+  const promptCtx = () => ({ rangeLabel, scopeLabel, minPosts, totals, overall, monthStats, qEvents, growthRows, avgRows, rateRows, growthSort });
+  const genQPrompt = () => { setQPrompt(buildQuarterPrompt(promptCtx())); setQCopied(false); };
+  const copyQPrompt = async () => {
+    try { await navigator.clipboard.writeText(qPrompt); setQCopied(true); showToast("已複製到剪貼簿"); setTimeout(() => setQCopied(false), 2000); }
+    catch (e) { showToast("複製失敗，請手動選取文字複製"); }
+  };
+  const loadQMd = (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => { setQAiResult(ev.target.result); showToast(`已載入「${file.name}」`); };
+    reader.readAsText(file, "utf-8"); e.target.value = "";
+  };
+  const downloadQReport = () => {
+    const html = buildQuarterReportHtml({ ...promptCtx(), aiResult: qAiResult });
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `Honda季報_${qMode === "fixed" ? `${year}Q${quarter}` : qMonths.join("_")}.html`; a.click();
+    showToast("HTML 季報已下載");
+  };
 
   const totals = useMemo(() => ({
     dealers: rows.length,
@@ -2939,13 +3155,17 @@ function QuarterReportView({ pages, posts, fanRecords, groupRecords, showToast, 
             <button style={styles.jumpBtn} onClick={() => jumpTo("q-growth")}><Icon name="users" size={14} />粉絲成長王</button>
             <button style={styles.jumpBtn} onClick={() => jumpTo("q-avg")}><Icon name="heart" size={14} />篇均互動數</button>
             <button style={styles.jumpBtn} onClick={() => jumpTo("q-rate")}><Icon name="spark" size={14} />篇均互動率</button>
+            <button style={styles.jumpBtn} onClick={() => jumpTo("q-top3")}><Icon name="crown" size={14} />前三名分析</button>
+            <button style={styles.jumpBtn} onClick={() => jumpTo("q-ai")}><Icon name="edit" size={14} />AI 季報</button>
           </div>
-          <div style={styles.floatNav}>
-            <button style={styles.jumpBtn} onClick={() => jumpTo("q-top")} title="回到頂端"><Icon name="arrowUp" size={14} />回頂端</button>
-            <button style={styles.jumpBtn} onClick={() => jumpTo("q-growth")}><Icon name="users" size={14} />粉絲成長王</button>
-            <button style={styles.jumpBtn} onClick={() => jumpTo("q-avg")}><Icon name="heart" size={14} />篇均互動數</button>
-            <button style={styles.jumpBtn} onClick={() => jumpTo("q-rate")}><Icon name="spark" size={14} />篇均互動率</button>
-          </div>
+          <FloatNav topId="q-top" items={[
+            { id: "q-insight", label: "重點圖表", icon: "chart" },
+            { id: "q-growth", label: "粉絲成長王", icon: "users" },
+            { id: "q-avg", label: "篇均互動數", icon: "heart" },
+            { id: "q-rate", label: "篇均互動率", icon: "spark" },
+            { id: "q-top3", label: "前三名分析", icon: "crown" },
+            { id: "q-ai", label: "AI 季報", icon: "edit" },
+          ]} />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
             <ChampionCard onClick={() => jumpTo("q-growth")} title="粉絲成長王" row={growthRows[0]}
               valueText={growthRows[0] ? (growthSort === "pct"
@@ -2959,6 +3179,10 @@ function QuarterReportView({ pages, posts, fanRecords, groupRecords, showToast, 
               valueText={rateRows[0] ? `${rateRows[0].rate.toFixed(2)}%` : ""}
               sub={rateRows[0] ? `中位數 ${fmtNum(rateRows[0].med, 1)} ÷ ${rateRows[0].fanBase.toLocaleString()} 粉` : ""} />
           </div>
+
+          <Anchor id="q-insight" />
+          <SectionTitle icon="chart" title="季度重點圖表" />
+          <QuarterInsights overall={overall} monthStats={monthStats} qEvents={qEvents} />
 
           {/* ---- Fan growth king ---- */}
           <div id="q-growth" style={{ scrollMarginTop: 70, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
@@ -3095,10 +3319,762 @@ function QuarterReportView({ pages, posts, fanRecords, groupRecords, showToast, 
               未達 {minPosts} 篇門檻、不列入互動王：{notQualified.map((r) => `${r.page.name}（${r.n} 篇）`).join("、")}
             </div>
           )}
+
+          <Anchor id="q-top3" />
+          <SectionTitle icon="crown" title="各類別前三名深度比較" />
+          <Top3Compare growthRows={growthRows} avgRows={avgRows} rateRows={rateRows} overall={overall} growthSort={growthSort} />
+
+          <Anchor id="q-ai" />
+          <SectionTitle icon="edit" title="AI 季報分析提示詞" />
+          <div style={styles.card}>
+            <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0, marginBottom: 16 }}>
+              系統會整理本季範圍（{rangeLabel}・{scopeLabel}）的三類前三名詳細數據：各形式與內容標籤的篇均互動、點子王貼文互動數、每月拆解{qEvents.length ? "、期間官方活動" : ""}，並要求 AI 分析成功原因是否與貼文類型有關、給出下季建議。複製後貼到 Claude 或 ChatGPT 即可。
+            </p>
+            <button style={styles.primaryBtn} onClick={genQPrompt}><Icon name="spark" size={16} />產生 AI 季報提示詞</button>
+            {qPrompt && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ fontSize: 12.5, color: "#9C9684" }}>已產生（{qPrompt.length.toLocaleString()} 字）— 若之後切換範圍或篩選，請重新產生</div>
+                  <button style={styles.secondaryBtn} onClick={copyQPrompt}><Icon name={qCopied ? "save" : "link"} size={15} />{qCopied ? "已複製 ✓" : "複製全部"}</button>
+                </div>
+                <textarea readOnly value={qPrompt} style={styles.promptTextarea} onClick={(e) => e.target.select()} />
+              </div>
+            )}
+          </div>
+
+          <SectionTitle icon="download" title="貼入 AI 結論 · 下載圖像化季報" />
+          <div style={styles.card}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+              <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, margin: 0, flex: 1, minWidth: 240 }}>
+                貼入 AI 回覆（或上傳 .md），系統會依「## 標題」把分析放進對應的圖表區塊：頒獎台、前三名卡片、形式效益長條圖、點子王對比、每月趨勢與下季建議。沒貼 AI 結論也能下載純數據版。
+              </p>
+              <button style={{ ...styles.secondaryBtn, flexShrink: 0 }} onClick={() => qMdRef.current?.click()}><Icon name="trend" size={15} />上傳 .md 檔案</button>
+              <input ref={qMdRef} type="file" accept=".md,.txt" style={{ display: "none" }} onChange={loadQMd} />
+            </div>
+            <textarea
+              placeholder={"在這裡貼入 AI 回覆的季報分析…\n\n## 季度總覽\n…\n## 粉絲成長王 前三名分析\n### 中台中\n…"}
+              value={qAiResult} onChange={(e) => setQAiResult(e.target.value)}
+              style={{ ...styles.promptTextarea, minHeight: 200, color: qAiResult ? "#3A3A38" : "#AAA" }} />
+            <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+              <button style={styles.primaryBtn} onClick={downloadQReport}><Icon name="download" size={16} />{qAiResult.trim() ? "下載 HTML 季報" : "下載 HTML 季報（純數據版）"}</button>
+              {qAiResult.trim() && <button style={{ ...styles.secondaryBtn, color: "#C08081" }} onClick={() => setQAiResult("")}>清除</button>}
+            </div>
+          </div>
         </>
       )}
     </div>
   );
+}
+
+/* ============================================================ Shared: colors, events, profiles, floating nav ============================================================ */
+// Categorical palette for post formats — validated (lightness / chroma / CVD / contrast all pass on light surface)
+const FORMAT_COLORS = { image: "#008C7A", video: "#B87420", reels: "#6A55A8", live: "#C2456A", other: "#4A86C5" };
+const formatOf = (p) => {
+  const f = p.format || p.type || "other";
+  if (f === "static") return "image";
+  if (f === "reel") return "reels";
+  return FORMAT_COLORS[f] ? f : "other";
+};
+const MIN_FORMAT_N = 3;
+const formatLabel = (f) => POST_FORMATS.find((t) => t.value === f)?.label || "其他";
+
+const EVENT_TYPES = [
+  { value: "season", label: "季節／節慶", color: "#B87420" },
+  { value: "launch", label: "新車發表", color: "#C2456A" },
+  { value: "campaign", label: "官方促銷活動", color: "#008C7A" },
+  { value: "other", label: "其他", color: "#6A55A8" },
+];
+const eventType = (v) => EVENT_TYPES.find((t) => t.value === v) || EVENT_TYPES[3];
+const eventEnd = (e) => (e.end && e.end >= e.start ? e.end : e.start);
+const eventsInMonths = (events, months) =>
+  (events || [])
+    .filter((e) => months.some((m) => e.start <= `${m}-31` && eventEnd(e) >= `${m}-01`))
+    .sort((a, b) => a.start.localeCompare(b.start));
+const eventRangeLabel = (e) => {
+  const s = e.start.slice(5).replace("-", "/");
+  const end = eventEnd(e);
+  return end !== e.start ? `${s}–${end.slice(5).replace("-", "/")}` : s;
+};
+
+// Per-dealer (or any post set) breakdown: formats, tags, sources, star posts, top post
+function postProfile(pp) {
+  const engs = pp.map(engagement);
+  const total = engs.reduce((a, b) => a + b, 0);
+  const n = pp.length;
+  const avg = n ? total / n : 0;
+  const formats = {};
+  Object.keys(FORMAT_COLORS).forEach((f) => (formats[f] = { n: 0, total: 0 }));
+  const tags = {};
+  const sources = { original: 0, repost: 0, ai: 0 };
+  pp.forEach((p) => {
+    const f = formatOf(p);
+    formats[f].n++; formats[f].total += engagement(p);
+    (p.tags || []).forEach((t) => {
+      tags[t] = tags[t] || { n: 0, total: 0 };
+      tags[t].n++; tags[t].total += engagement(p);
+    });
+    const s = p.source || "original";
+    sources[sources[s] != null ? s : "original"]++;
+  });
+  const starPosts = pp.filter((p) => p.star);
+  const nonStar = pp.filter((p) => !p.star);
+  const starTotal = starPosts.reduce((s, p) => s + engagement(p), 0);
+  const nonStarTotal = nonStar.reduce((s, p) => s + engagement(p), 0);
+  const sorted = [...pp].sort((a, b) => engagement(b) - engagement(a));
+  const topPost = sorted[0] || null;
+  const formatRank = Object.entries(formats).filter(([, v]) => v.n > 0)
+    .map(([f, v]) => ({ f, n: v.n, total: v.total, avg: v.total / v.n })).sort((a, b) => b.avg - a.avg);
+  const bestFormat = formatRank.find((x) => x.n >= MIN_FORMAT_N) || null; // ignore tiny samples for headlines
+  const tagRank = Object.entries(tags).map(([t, v]) => ({ t, n: v.n, total: v.total, avg: v.total / v.n }))
+    .sort((a, b) => b.n - a.n || b.avg - a.avg);
+  return {
+    n, total, avg, median: n ? median(engs) : 0, formats, formatRank, bestFormat, tagRank, sources,
+    star: { n: starPosts.length, total: starTotal, avg: starPosts.length ? starTotal / starPosts.length : 0, posts: starPosts },
+    nonStarAvg: nonStar.length ? nonStarTotal / nonStar.length : 0,
+    topPost, topShare: total ? engagement(topPost) / total : 0,
+  };
+}
+
+// Rule-based observations (data facts, not AI) about why a dealer performs
+function profileInsights(prof, baseline) {
+  const out = [];
+  if (!prof.n) return out;
+  const best = prof.bestFormat;
+  if (best && prof.formatRank.filter((x) => x.n >= MIN_FORMAT_N).length > 1)
+    out.push(`${formatLabel(best.f)}表現最好：均 ${fmtNum(best.avg, 0)} 互動／篇（${best.n} 篇）`);
+  if (baseline && best && baseline.avg > 0 && best.avg / baseline.avg >= 1.5)
+    out.push(`${formatLabel(best.f)}均互動是全體平均的 ${(best.avg / baseline.avg).toFixed(1)} 倍`);
+  const live = prof.formats.live;
+  if (live.n > 0 && prof.total > 0 && live.total / prof.total >= 0.3)
+    out.push(`直播 ${live.n} 篇貢獻 ${Math.round((live.total / prof.total) * 100)}% 互動，篇均數字有被拉高`);
+  if (prof.star.n > 0 && prof.nonStarAvg > 0) {
+    const r = prof.star.avg / prof.nonStarAvg;
+    out.push(r >= 1.15
+      ? `點子王 ${prof.star.n} 篇均 ${fmtNum(prof.star.avg, 0)}，是一般貼文的 ${r.toFixed(1)} 倍`
+      : r <= 0.85
+        ? `點子王 ${prof.star.n} 篇均 ${fmtNum(prof.star.avg, 0)}，低於一般貼文均 ${fmtNum(prof.nonStarAvg, 0)}（創意分高但互動未必高）`
+        : `點子王 ${prof.star.n} 篇均 ${fmtNum(prof.star.avg, 0)}，與一般貼文相近`);
+  }
+  if (prof.topShare >= 0.35 && prof.n >= 4)
+    out.push(`互動集中：最高一篇就佔 ${Math.round(prof.topShare * 100)}%`);
+  if (prof.n >= 4 && prof.median >= prof.avg * 0.75)
+    out.push(`中位數接近平均，每篇表現穩定`);
+  const ownShare = prof.sources.original / prof.n;
+  if (ownShare >= 0.8 && prof.n >= 4) out.push(`自製比例 ${Math.round(ownShare * 100)}%`);
+  else if (prof.sources.repost / prof.n >= 0.5) out.push(`轉發佔 ${Math.round((prof.sources.repost / prof.n) * 100)}%`);
+  return out.slice(0, 4);
+}
+
+/* Floating section navigator (bottom-right), shared by month & quarter reports */
+function FloatNav({ items, topId }) {
+  const [open, setOpen] = useState(true);
+  const jump = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (!open) {
+    return (
+      <button style={{ ...styles.floatNav, padding: 0, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#5C5847" }}
+        onClick={() => setOpen(true)} title="展開區塊導覽"><Icon name="list" size={18} /></button>
+    );
+  }
+  return (
+    <div style={styles.floatNav}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px 2px 6px" }}>
+        <span style={{ fontSize: 11, color: "#A6A096", letterSpacing: 1 }}>快速跳轉</span>
+        <button style={{ ...styles.iconBtn, padding: 2 }} onClick={() => setOpen(false)} title="收合"><Icon name="x" size={13} /></button>
+      </div>
+      {topId && <button style={styles.jumpBtn} onClick={() => jump(topId)}><Icon name="arrowUp" size={14} />回頂端</button>}
+      {items.map((it) => (
+        <button key={it.id} style={styles.jumpBtn} onClick={() => jump(it.id)}><Icon name={it.icon} size={14} />{it.label}</button>
+      ))}
+    </div>
+  );
+}
+
+const Anchor = ({ id }) => <div id={id} style={{ scrollMarginTop: 16, height: 0 }} />;
+
+/* ---- Small infographic building blocks (HTML, hover tooltips via title) ---- */
+function HBarList({ items, max, unitLabel = "", valueFmt = (v) => fmtNum(v, 1) }) {
+  const m = max || Math.max(...items.map((i) => i.value), 1);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+      {items.map((it) => (
+        <div key={it.label} title={it.tip || `${it.label}：${valueFmt(it.value)}${unitLabel}`}
+          style={{ display: "grid", gridTemplateColumns: "84px 1fr auto", gap: 10, alignItems: "center", fontSize: 12.5 }}>
+          <span style={{ color: "#5C5847", display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+            {it.color && <span style={{ width: 9, height: 9, borderRadius: 2, background: it.color, flexShrink: 0 }} />}
+            {it.label}
+          </span>
+          <div style={{ height: 14, background: "#F0EDE6", borderRadius: 4, overflow: "hidden" }}>
+            <div style={{ width: `${Math.max((it.value / m) * 100, it.value > 0 ? 2 : 0)}%`, height: "100%", background: it.color || "#008C7A", borderRadius: "0 4px 4px 0" }} />
+          </div>
+          <span style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#3A3A38", minWidth: 120, textAlign: "right", whiteSpace: "nowrap" }}>
+            <b>{valueFmt(it.value)}</b>{unitLabel}
+            {it.sub && <span style={{ color: "#A6A096", fontSize: 11, marginLeft: 6 }}>{it.sub}</span>}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FormatStack({ formats, height = 12, showLabels = false }) {
+  const total = Object.values(formats).reduce((s, v) => s + v.n, 0);
+  if (!total) return <div style={{ fontSize: 12, color: "#A6A096" }}>無貼文</div>;
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 2, height, borderRadius: 4, overflow: "hidden" }}>
+        {Object.entries(formats).filter(([, v]) => v.n > 0).map(([f, v]) => (
+          <div key={f} title={`${formatLabel(f)}：${v.n} 篇（${Math.round((v.n / total) * 100)}%），均互動 ${fmtNum(v.total / v.n, 1)}`}
+            style={{ flex: v.n, background: FORMAT_COLORS[f] }} />
+        ))}
+      </div>
+      {showLabels && (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 5, fontSize: 11, color: "#7A7568" }}>
+          {Object.entries(formats).filter(([, v]) => v.n > 0).map(([f, v]) => (
+            <span key={f}>{formatLabel(f)} {v.n}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FormatLegend() {
+  return (
+    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, color: "#5C5847" }}>
+      {Object.keys(FORMAT_COLORS).map((f) => (
+        <span key={f} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 2, background: FORMAT_COLORS[f] }} />{formatLabel(f)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function MiniMonthBars({ byMonth, field = "total", color = "#008C7A" }) {
+  const max = Math.max(...byMonth.map((b) => b[field] || 0), 1);
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 62, paddingTop: 8 }}>
+      {byMonth.map((b) => (
+        <div key={b.m} title={`${monthLabel(b.m)}：${(b[field] || 0).toLocaleString()}`}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+          <span style={{ fontSize: 10.5, color: "#5C5847", fontFamily: "'Space Grotesk', sans-serif" }}>{(b[field] || 0).toLocaleString()}</span>
+          <div style={{ width: "100%", maxWidth: 34, height: Math.max(((b[field] || 0) / max) * 30, 2), background: color, borderRadius: "4px 4px 0 0" }} />
+          <span style={{ fontSize: 10.5, color: "#A6A096" }}>{parseInt(b.m.slice(5))}月</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---- Markdown → HTML (escaped) for exported reports ---- */
+function mdLiteToHtml(md) {
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>");
+  const out = []; let list = null;
+  const flush = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  md.split("\n").forEach((raw) => {
+    const line = raw.trimEnd();
+    let m;
+    if (!line.trim()) { flush(); return; }
+    if ((m = line.match(/^#{3,6}\s+(.+)/))) { flush(); out.push(`<h4>${inline(m[1])}</h4>`); return; }
+    if ((m = line.match(/^\s*[-*•]\s+(.+)/))) { if (list !== "ul") { flush(); out.push("<ul>"); list = "ul"; } out.push(`<li>${inline(m[1])}</li>`); return; }
+    if ((m = line.match(/^\s*\d+[.)、]\s+(.+)/))) { if (list !== "ol") { flush(); out.push("<ol>"); list = "ol"; } out.push(`<li>${inline(m[1])}</li>`); return; }
+    flush(); out.push(`<p>${inline(line)}</p>`);
+  });
+  flush();
+  return out.join("\n");
+}
+
+function splitMdSections(md) {
+  const sections = []; let cur = { title: "", body: [] };
+  md.split("\n").forEach((line) => {
+    const h = line.match(/^#{1,2}\s+(.+)/);
+    if (h) { if (cur.title || cur.body.join("").trim()) sections.push(cur); cur = { title: h[1].trim(), body: [] }; }
+    else cur.body.push(line);
+  });
+  if (cur.title || cur.body.join("").trim()) sections.push(cur);
+  return sections.map((s) => ({ title: s.title, body: s.body.join("\n").trim() }));
+}
+
+/* ============================================================ Quarter: infographics, Top-3 deep dive, AI prompt, HTML report ============================================================ */
+const Q_CATS = [
+  { key: "growth", label: "粉絲成長王", icon: "users" },
+  { key: "avg", label: "互動王（篇均互動數）", icon: "heart" },
+  { key: "rate", label: "互動王（篇均互動率）", icon: "spark" },
+];
+
+function catMetric(cat, r, growthSort) {
+  if (cat === "growth") {
+    if (growthSort === "pct") return r.pct != null ? `${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%` : "—";
+    return r.diff != null ? `${r.diff >= 0 ? "+" : ""}${r.diff.toLocaleString()} 人` : "僅一筆";
+  }
+  if (cat === "avg") return `${fmtNum(r.avg, 1)} 互動／篇`;
+  return `${r.rate.toFixed(2)}%`;
+}
+function catMetricSub(cat, r) {
+  if (cat === "growth") return r.first ? `${r.first.count.toLocaleString()} → ${r.last.count.toLocaleString()} 人` : "";
+  if (cat === "avg") return `${r.n} 篇 · 總互動 ${r.total.toLocaleString()}`;
+  return `中位數 ${fmtNum(r.med, 1)} ÷ ${r.fanBase.toLocaleString()} 粉`;
+}
+
+function QuarterInsights({ overall, monthStats, qEvents }) {
+  const formatItems = overall.formatRank.map((x) => ({
+    label: formatLabel(x.f), value: x.avg, color: FORMAT_COLORS[x.f], sub: x.n < MIN_FORMAT_N ? `${x.n} 篇・樣本少` : `${x.n} 篇`,
+    tip: `${formatLabel(x.f)}：${x.n} 篇，總互動 ${x.total.toLocaleString()}，均 ${fmtNum(x.avg, 1)}`,
+  }));
+  const tagItems = [...overall.tagRank].filter((t) => t.n >= 3).sort((a, b) => b.avg - a.avg).map((t) => ({
+    label: t.t, value: t.avg, color: "#5C6B73", sub: `${t.n} 篇`,
+  }));
+  const starRatio = overall.nonStarAvg > 0 && overall.star.n ? overall.star.avg / overall.nonStarAvg : null;
+  const bestF = overall.bestFormat;
+  const topRaw = overall.formatRank[0];
+  const bestT = tagItems[0];
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 14 }}>
+      <div style={styles.card}>
+        <div style={styles.infoTitle}>貼文形式 × 篇均互動</div>
+        {bestF && <div style={styles.infoHeadline}>{formatLabel(bestF.f)}最吸互動，均 {fmtNum(bestF.avg, 0)}／篇</div>}
+        {topRaw && bestF && topRaw.f !== bestF.f && <div style={{ fontSize: 11.5, color: "#A6A096", marginTop: -10, marginBottom: 12 }}>{formatLabel(topRaw.f)}數字更高但只有 {topRaw.n} 篇，不列入結論</div>}
+        <HBarList items={formatItems} />
+      </div>
+      <div style={styles.card}>
+        <div style={styles.infoTitle}>內容標籤 × 篇均互動 <span style={{ fontWeight: 400, color: "#A6A096" }}>（3 篇以上）</span></div>
+        {bestT && <div style={styles.infoHeadline}>「{bestT.label}」類效果最好，均 {fmtNum(bestT.value, 0)}／篇</div>}
+        {tagItems.length ? <HBarList items={tagItems} /> : <div style={{ fontSize: 12.5, color: "#A6A096" }}>內容標籤資料不足</div>}
+      </div>
+      <div style={styles.card}>
+        <div style={styles.infoTitle}>⭐ 點子王 vs 一般貼文</div>
+        {starRatio ? <div style={styles.infoHeadline}>點子王貼文互動是一般貼文的 {starRatio.toFixed(1)} 倍</div> : <div style={styles.infoHeadline}>這段期間沒有點子王貼文</div>}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {[["點子王", overall.star.avg, `${overall.star.n} 篇 · 總互動 ${overall.star.total.toLocaleString()}`, "#B08968"],
+            ["一般貼文", overall.nonStarAvg, `${overall.n - overall.star.n} 篇`, "#8A9A8E"]].map(([l, v, sub, c]) => (
+            <div key={l} style={{ background: "#F7F4EE", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ fontSize: 12, color: "#9C9684" }}>{l} 均互動</div>
+              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 28, fontWeight: 600, color: "#33312C" }}>{fmtNum(v, 1)}</div>
+              <div style={{ height: 6, borderRadius: 3, background: c, width: `${Math.max((v / Math.max(overall.star.avg, overall.nonStarAvg, 1)) * 100, 3)}%`, margin: "6px 0" }} />
+              <div style={{ fontSize: 11.5, color: "#A6A096" }}>{sub}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={styles.card}>
+        <div style={styles.infoTitle}>每月總互動 · 發文數</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+          <div><div style={{ fontSize: 11.5, color: "#A6A096", marginBottom: 4 }}>總互動</div><MiniMonthBars byMonth={monthStats} field="total" color="#008C7A" /></div>
+          <div><div style={{ fontSize: 11.5, color: "#A6A096", marginBottom: 4 }}>發文篇數</div><MiniMonthBars byMonth={monthStats} field="n" color="#5C6B73" /></div>
+        </div>
+        {qEvents.length > 0 && (
+          <div style={{ marginTop: 14, borderTop: "1px solid #E6E1D6", paddingTop: 10 }}>
+            <div style={{ fontSize: 11.5, color: "#A6A096", marginBottom: 6 }}>期間官方活動</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {qEvents.map((e) => <EventChip key={e.id} e={e} />)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EventChip({ e, muted, onClick }) {
+  const t = eventType(e.type);
+  return (
+    <span onClick={onClick} title={`${t.label}｜${e.start}${eventEnd(e) !== e.start ? " ~ " + eventEnd(e) : ""}${e.note ? "｜" + e.note : ""}`}
+      style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 9px", borderRadius: 999, fontSize: 12, cursor: onClick ? "pointer" : "default",
+        border: `1px solid ${muted ? "#E0DACE" : t.color}`, color: muted ? "#B5AE9F" : "#3A3A38", background: muted ? "#F6F3EE" : "#fff", textDecoration: muted ? "line-through" : "none" }}>
+      <span style={{ width: 8, height: 8, borderRadius: 2, background: muted ? "#D0CAC0" : t.color }} />
+      {e.title}<span style={{ color: "#A6A096", fontFamily: "'Space Grotesk', sans-serif" }}>{eventRangeLabel(e)}</span>
+    </span>
+  );
+}
+
+function Top3Card({ r, rank, cat, overall, growthSort }) {
+  const prof = r.prof;
+  const insights = profileInsights(prof, overall);
+  const medal = ["#B08968", "#9C9C9C", "#A9765A"][rank];
+  const best = prof.bestFormat;
+  return (
+    <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 12, borderTop: `3px solid ${medal}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 15, background: medal, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{rank + 1}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 17 }}><PageNameCell page={r.page} /></div>
+          <MonthGroupBadges list={r.groupsByMonth} />
+        </div>
+      </div>
+      <div>
+        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 600, color: "#33312C" }}>{catMetric(cat, r, growthSort)}</div>
+        <div style={{ fontSize: 11.5, color: "#A6A096" }}>{catMetricSub(cat, r)}</div>
+      </div>
+      <div>
+        <div style={styles.miniLabel}>每月總互動</div>
+        <MiniMonthBars byMonth={r.byMonth} field="total" />
+      </div>
+      <div>
+        <div style={styles.miniLabel}>貼文形式（{prof.n} 篇）{best && prof.formatRank.filter((x) => x.n >= MIN_FORMAT_N).length > 1 && <span style={{ color: "#5C5847" }}> · 最強：{formatLabel(best.f)} 均 {fmtNum(best.avg, 0)}</span>}</div>
+        <FormatStack formats={prof.formats} showLabels />
+      </div>
+      {prof.tagRank.length > 0 && (
+        <div>
+          <div style={styles.miniLabel}>內容標籤</div>
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {prof.tagRank.slice(0, 4).map((t) => (
+              <span key={t.t} title={`均互動 ${fmtNum(t.avg, 1)}`} style={{ fontSize: 11.5, padding: "2px 8px", borderRadius: 6, background: "#F0EDE6", color: "#5C5847" }}>{t.t} ×{t.n} <span style={{ color: "#A6A096" }}>均{fmtNum(t.avg, 0)}</span></span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div style={styles.miniStat}>
+          <div style={styles.miniLabel}>⭐ 點子王</div>
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 15, fontWeight: 600 }}>{prof.star.n} 篇</div>
+          <div style={{ fontSize: 11, color: "#A6A096" }}>{prof.star.n ? `互動 ${prof.star.total.toLocaleString()} · 均 ${fmtNum(prof.star.avg, 0)}` : "—"}</div>
+        </div>
+        <div style={styles.miniStat}>
+          <div style={styles.miniLabel}>來源</div>
+          <div style={{ fontSize: 12.5, color: "#3A3A38", lineHeight: 1.6 }}>自製 {prof.sources.original} · 轉發 {prof.sources.repost} · AI {prof.sources.ai}</div>
+        </div>
+      </div>
+      {prof.topPost && (
+        <div style={{ fontSize: 12, color: "#5C5847", background: "#F7F4EE", borderRadius: 8, padding: "8px 10px" }}>
+          最高互動：{prof.topPost.date?.slice(5)} {formatLabel(formatOf(prof.topPost))}{prof.topPost.star ? " ⭐" : ""} · <b>{engagement(prof.topPost).toLocaleString()}</b> 互動
+          {prof.topPost.url && <a href={prof.topPost.url} target="_blank" rel="noreferrer" style={{ color: "#008C7A", marginLeft: 6 }}>查看 ↗</a>}
+        </div>
+      )}
+      {insights.length > 0 && (
+        <div>
+          <div style={styles.miniLabel}>數據觀察</div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "#3A3A38", lineHeight: 1.75 }}>
+            {insights.map((s) => <li key={s}>{s}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Top3Compare({ growthRows, avgRows, rateRows, overall, growthSort }) {
+  const [cat, setCat] = useState("growth");
+  const list = (cat === "growth" ? growthRows : cat === "avg" ? avgRows : rateRows).slice(0, 3);
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {Q_CATS.map((c) => (
+            <button key={c.key} style={{ ...styles.chipBtn, display: "inline-flex", alignItems: "center", gap: 6, ...(cat === c.key ? styles.chipBtnActive : {}) }} onClick={() => setCat(c.key)}>
+              <Icon name={c.icon} size={14} />{c.label}
+            </button>
+          ))}
+        </div>
+        <FormatLegend />
+      </div>
+      {list.length === 0 ? <div style={styles.card}><EmptyState text="此類別沒有符合條件的經銷商。" /></div> : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+          {list.map((r, i) => <Top3Card key={r.page.id} r={r} rank={i} cat={cat} overall={overall} growthSort={growthSort} />)}
+        </div>
+      )}
+      <div style={{ fontSize: 12, color: "#A6A096" }}>「數據觀察」是系統依數字自動整理的事實；成功原因的判讀與下季建議，請用下方 AI 提示詞產生。</div>
+    </>
+  );
+}
+
+/* ---------------- Quarter AI prompt ---------------- */
+function buildQuarterPrompt(ctx) {
+  const { rangeLabel, scopeLabel, minPosts, totals, overall, monthStats, qEvents, growthRows, avgRows, rateRows, growthSort } = ctx;
+  const L = [];
+  const gStr = (r) => r.groupsByMonth.map(({ m, g }) => `${parseInt(m.slice(5))}月${g || "未參賽"}`).join("、");
+  const monthStr = (r, k) => r.byMonth.map((b) => `${parseInt(b.m.slice(5))}月${b[k]}`).join(" + ");
+  const dealerBlock = (r, i, cat) => {
+    const p = r.prof;
+    L.push(`  第${i + 1}名　${r.page.name}（${gStr(r)}）`);
+    if (cat === "growth") L.push(`    粉絲：${r.first.date} ${r.first.count} → ${r.last.date} ${r.last.count}，增減 ${r.diff ?? "僅一筆"}${r.pct != null ? `（${r.pct.toFixed(1)}%）` : ""}`);
+    if (cat === "avg") L.push(`    篇均互動 ${fmtNum(r.avg, 1)}，中位數 ${fmtNum(r.med, 1)}`);
+    if (cat === "rate") L.push(`    篇均互動率 ${r.rate.toFixed(2)}%（中位數 ${fmtNum(r.med, 1)} ÷ 粉絲 ${r.fanBase}）`);
+    L.push(`    篇數 ${r.n}（${monthStr(r, "n")}）；總互動 ${r.total}（${monthStr(r, "total")}）`);
+    L.push(`    形式：${p.formatRank.map((x) => `${formatLabel(x.f)}${x.n}篇 均${fmtNum(x.avg, 1)}`).join("、") || "無"}`);
+    if (p.tagRank.length) L.push(`    內容標籤：${p.tagRank.map((t) => `${t.t}${t.n}篇 均${fmtNum(t.avg, 1)}`).join("、")}`);
+    L.push(`    來源：自製${p.sources.original}、轉發${p.sources.repost}、AI${p.sources.ai}`);
+    L.push(`    點子王：${p.star.n} 篇${p.star.n ? `，總互動 ${p.star.total}、均 ${fmtNum(p.star.avg, 1)}（一般貼文均 ${fmtNum(p.nonStarAvg, 1)}）` : ""}`);
+    p.star.posts.forEach((s) => L.push(`      ⭐ ${s.date} ${formatLabel(formatOf(s))}${(s.tags || []).length ? "／" + s.tags.join("、") : ""}：讚${s.likes || 0} 留${s.comments || 0} 分${s.shares || 0}＝${engagement(s)}${s.url ? "　" + s.url : ""}`));
+    if (p.topPost) L.push(`    最高互動貼文：${p.topPost.date} ${formatLabel(formatOf(p.topPost))}，${engagement(p.topPost)} 互動（佔該店 ${Math.round(p.topShare * 100)}%）${p.topPost.url ? "　" + p.topPost.url : ""}`);
+    const ins = profileInsights(p, overall);
+    if (ins.length) L.push(`    系統觀察：${ins.join("；")}`);
+  };
+
+  L.push(`你是 Honda Taiwan 的社群媒體分析師。以下是 ${rangeLabel} Honda 各經銷商 Facebook 粉絲團的季度競賽數據（${scopeLabel}），請撰寫一份季度分析報告。`);
+  L.push("");
+  L.push("【指標定義】");
+  L.push("・互動 = 讚＋留言＋分享");
+  L.push("・粉絲成長王 = 季末最新粉絲數 − 季初最舊粉絲數");
+  L.push("・互動王（篇均互動數）= 總互動 ÷ 總篇數 → 看絕對互動量");
+  L.push("・互動王（篇均互動率）= 中位數互動 ÷ 粉絲數 × 100% → 排除直播異常值、校正粉絲規模，最公平");
+  L.push(`・互動王需至少 ${minPosts} 篇才列入排名；每家只計入有參賽的月份`);
+  L.push(`・某形式或標籤少於 ${MIN_FORMAT_N} 篇時屬於樣本不足，請勿據此下結論`);
+  L.push("");
+  L.push("【報告格式 — 請嚴格使用以下 Markdown 二級標題（## 開頭，文字不要改），系統會依標題自動排成圖像化季報】");
+  L.push("## 季度總覽");
+  L.push("（3 句話內講完本季最重要的結論，再列 3 個關鍵數字）");
+  L.push("## 粉絲成長王 前三名分析");
+  L.push("## 互動王（篇均互動數）前三名分析");
+  L.push("## 互動王（篇均互動率）前三名分析");
+  L.push("（以上三段，每家各寫一小段，用 ### 店名 當小標，需涵蓋：");
+  L.push("  1. 成功原因：是否與貼文形式（圖片／影片／Reels／直播）或內容標籤有關？請引用該店各形式的篇均互動做比較");
+  L.push("  2. 點子王貼文的互動數與貢獻度，以及這些貼文的共通點");
+  L.push("  3. 三家之間的差異比較；篇均互動數是否被直播或單篇爆文拉高；粉絲暴增是否疑似廣告投放或活動導流");
+  L.push("  4. 該店下季的具體建議）");
+  L.push("## 貼文類型效益");
+  L.push("（整體比較各形式與內容標籤的互動效果，哪一類最值得投入；點子王貼文的共通點）");
+  if (qEvents.length) {
+    L.push("## 官方活動影響");
+    L.push("（官方活動期間前後的發文與互動是否有變化，哪些經銷商有效搭上活動）");
+  }
+  L.push("## 下季建議");
+  L.push("（1. 前三名如何維持優勢　2. 中後段經銷商的具體改善方向　3. 全體適用的三個行動方針，每點一行粗體標題＋說明）");
+  L.push("");
+  L.push("請以繁體中文撰寫，語氣專業精簡，多用條列，每段不超過 200 字。分析要引用下方數字，不要編造資料中沒有的事實。");
+  L.push("");
+  L.push("---");
+  L.push("");
+  L.push("【季度整體】");
+  L.push(`  納入 ${totals.dealers} 家｜貼文 ${totals.posts} 篇｜總互動 ${totals.eng.toLocaleString()}｜篇均 ${fmtNum(overall.avg, 1)}｜中位數 ${fmtNum(overall.median, 1)}｜粉絲淨增 ${totals.growth >= 0 ? "+" : ""}${totals.growth}`);
+  L.push(`  每月：${monthStats.map((b) => `${parseInt(b.m.slice(5))}月 ${b.n}篇／互動${b.total}`).join("、")}`);
+  L.push("");
+  L.push("【各形式效益（全體）】");
+  overall.formatRank.forEach((x) => L.push(`  ${formatLabel(x.f)}：${x.n} 篇，總互動 ${x.total}，篇均 ${fmtNum(x.avg, 1)}`));
+  L.push("【各內容標籤效益（全體）】");
+  overall.tagRank.forEach((t) => L.push(`  ${t.t}：${t.n} 篇，篇均 ${fmtNum(t.avg, 1)}`));
+  L.push(`【點子王 vs 一般貼文】點子王 ${overall.star.n} 篇，均 ${fmtNum(overall.star.avg, 1)}；一般貼文均 ${fmtNum(overall.nonStarAvg, 1)}`);
+  L.push("");
+  if (qEvents.length) {
+    L.push("【期間官方活動】");
+    qEvents.forEach((e) => L.push(`  ${e.start}${eventEnd(e) !== e.start ? "～" + eventEnd(e) : ""}　${eventType(e.type).label}：${e.title}${e.note ? `（${e.note}）` : ""}`));
+    L.push("");
+  }
+  L.push(`【粉絲成長王 前三名】（依${growthSort === "pct" ? "成長率" : "增減人數"}）`);
+  growthRows.slice(0, 3).forEach((r, i) => dealerBlock(r, i, "growth"));
+  L.push("");
+  L.push("【互動王（篇均互動數）前三名】");
+  avgRows.slice(0, 3).forEach((r, i) => dealerBlock(r, i, "avg"));
+  L.push("");
+  L.push("【互動王（篇均互動率）前三名】");
+  rateRows.slice(0, 3).forEach((r, i) => dealerBlock(r, i, "rate"));
+  L.push("");
+  L.push("【完整排名摘要（供比較中後段）】");
+  L.push("  粉絲成長：" + growthRows.slice(0, 15).map((r, i) => `${i + 1}.${r.page.name}${r.diff != null ? (r.diff >= 0 ? "+" : "") + r.diff : "—"}`).join("、"));
+  L.push("  篇均互動數：" + avgRows.slice(0, 15).map((r, i) => `${i + 1}.${r.page.name}${fmtNum(r.avg, 1)}`).join("、"));
+  L.push("  篇均互動率：" + rateRows.slice(0, 15).map((r, i) => `${i + 1}.${r.page.name}${r.rate.toFixed(2)}%`).join("、"));
+  return L.join("\n");
+}
+
+/* ---------------- Quarter HTML report (infographic) ---------------- */
+function buildQuarterReportHtml(ctx) {
+  const { rangeLabel, scopeLabel, totals, overall, monthStats, qEvents, growthRows, avgRows, rateRows, aiResult, growthSort } = ctx;
+  const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const sections = splitMdSections(aiResult || "");
+  const used = new Set();
+  const take = (...keys) => {
+    const idx = sections.findIndex((s, i) => !used.has(i) && keys.some((k) => s.title.includes(k)));
+    if (idx < 0) return "";
+    used.add(idx);
+    return mdLiteToHtml(sections[idx].body);
+  };
+  const aiRate = take("互動率");
+  const aiAvg = take("篇均互動數", "互動數");
+  const aiGrowth = take("粉絲成長");
+  const aiOverview = take("總覽", "摘要", "重點");
+  const aiFormat = take("類型", "形式", "內容");
+  const aiEvents = take("活動");
+  const aiNext = take("建議", "下季", "行動");
+  const rest = sections.filter((s, i) => !used.has(i) && (s.title || s.body));
+
+  const fmt1 = (v) => fmtNum(v, 1);
+  const bars = (items) => {
+    const max = Math.max(...items.map((i) => i.value), 1);
+    return `<div class="bars">${items.map((i) => `
+      <div class="bar-row" title="${esc(i.tip || "")}"><span class="bl"><i style="background:${i.color}"></i>${esc(i.label)}</span>
+      <span class="bt"><span class="bf" style="width:${Math.max((i.value / max) * 100, 2)}%;background:${i.color}"></span></span>
+      <span class="bv"><b>${fmt1(i.value)}</b> <small>${esc(i.sub || "")}</small></span></div>`).join("")}</div>`;
+  };
+  const stack = (formats) => {
+    const tot = Object.values(formats).reduce((s, v) => s + v.n, 0) || 1;
+    return `<div class="stack">${Object.entries(formats).filter(([, v]) => v.n).map(([f, v]) =>
+      `<span style="flex:${v.n};background:${FORMAT_COLORS[f]}" title="${formatLabel(f)} ${v.n} 篇，均 ${fmt1(v.total / v.n)}"></span>`).join("")}</div>
+      <div class="stack-l">${Object.entries(formats).filter(([, v]) => v.n).map(([f, v]) => `<span><i style="background:${FORMAT_COLORS[f]}"></i>${formatLabel(f)} ${v.n}（${Math.round((v.n / tot) * 100)}%）</span>`).join("")}</div>`;
+  };
+  const groupsStr = (r) => r.groupsByMonth.map(({ m, g }) => `<span class="gb ${g ? "g" + g : ""}">${parseInt(m.slice(5))}月${g || "–"}</span>`).join("");
+  const metric = (cat, r) => catMetric(cat, r, growthSort);
+  const podium = (cat, list) => {
+    const order = [1, 0, 2].filter((i) => list[i]);
+    const h = { 0: 120, 1: 88, 2: 66 };
+    return `<div class="podium">${order.map((i) => `
+      <div class="pod">
+        <div class="pod-name">${esc(list[i].page.name)}</div>
+        <div class="pod-val">${esc(metric(cat, list[i]))}</div>
+        <div class="pod-bar r${i}" style="height:${h[i]}px"><span>${i + 1}</span></div>
+      </div>`).join("")}</div>`;
+  };
+  const detailCard = (cat, r, i) => {
+    const p = r.prof;
+    const ins = profileInsights(p, overall);
+    const mmax = Math.max(...r.byMonth.map((b) => b.total), 1);
+    return `<div class="dcard r${i}">
+      <div class="dc-h"><span class="rk r${i}">${i + 1}</span><div><div class="dc-n">${esc(r.page.name)}</div><div>${groupsStr(r)}</div></div></div>
+      <div class="dc-m">${esc(metric(cat, r))}<small>${esc(catMetricSub(cat, r))}</small></div>
+      <div class="lab">每月總互動</div>
+      <div class="mbars">${r.byMonth.map((b) => `<div><em>${b.total.toLocaleString()}</em><span style="height:${Math.max((b.total / mmax) * 40, 2)}px"></span><small>${parseInt(b.m.slice(5))}月</small></div>`).join("")}</div>
+      <div class="lab">貼文形式（${p.n} 篇）</div>${stack(p.formats)}
+      <div class="kv"><div><span class="lab">⭐ 點子王</span><b>${p.star.n} 篇</b><small>${p.star.n ? `互動 ${p.star.total.toLocaleString()}・均 ${fmtNum(p.star.avg, 0)}` : "—"}</small></div>
+      <div><span class="lab">最強形式（≥${MIN_FORMAT_N}篇）</span><b>${p.bestFormat ? formatLabel(p.bestFormat.f) : "—"}</b><small>${p.bestFormat ? `均 ${fmtNum(p.bestFormat.avg, 0)}／篇・${p.bestFormat.n}篇` : "樣本不足"}</small></div></div>
+      ${ins.length ? `<ul class="ins">${ins.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
+    </div>`;
+  };
+  const catBlock = (cat, title, list, ai, note) => `
+  <section class="section">
+    <div class="sh"><h2>${title}</h2><small>${note}</small></div>
+    ${list.length ? `<div class="cat-top">${podium(cat, list)}</div>
+    <div class="dgrid">${list.map((r, i) => detailCard(cat, r, i)).join("")}</div>` : `<p class="muted">此類別沒有符合條件的經銷商</p>`}
+    ${ai ? `<div class="ai">${ai}</div>` : ""}
+  </section>`;
+
+  const formatItems = overall.formatRank.map((x) => ({ label: formatLabel(x.f), value: x.avg, color: FORMAT_COLORS[x.f], sub: x.n < MIN_FORMAT_N ? `${x.n} 篇・樣本少` : `${x.n} 篇` }));
+  const tagItems = overall.tagRank.filter((t) => t.n >= 3).sort((a, b) => b.avg - a.avg).map((t) => ({ label: t.t, value: t.avg, color: "#5C6B73", sub: `${t.n} 篇` }));
+  const mMax = Math.max(...monthStats.map((b) => b.total), 1);
+  const starRatio = overall.nonStarAvg > 0 && overall.star.n ? (overall.star.avg / overall.nonStarAvg).toFixed(1) : null;
+
+  return `<!DOCTYPE html>
+<html lang="zh-Hant"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Honda 粉絲團季報 ${esc(rangeLabel)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700&family=Noto+Sans+TC:wght@400;500;700&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',sans-serif;background:#F5F3EE;color:#1E1E1C;font-size:14px;line-height:1.65}
+.report{max-width:1040px;margin:0 auto;padding:40px 28px 80px}
+.num{font-family:'Space Grotesk',sans-serif}
+.cover{background:#1E1E1C;color:#F5F4F1;border-radius:22px;padding:48px 52px;margin-bottom:28px;position:relative;overflow:hidden}
+.cover::after{content:'';position:absolute;right:-80px;top:-80px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,#008C7A55,transparent 70%)}
+.cover-label{font-size:11px;letter-spacing:3px;color:#999;font-family:'Space Grotesk',sans-serif;margin-bottom:12px}
+.cover h1{font-family:'Noto Serif TC',serif;font-size:36px;line-height:1.25}
+.cover-sub{color:#AAA;margin:6px 0 30px;font-size:14px}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;position:relative;z-index:1}
+.kpi{background:#ffffff10;border:1px solid #ffffff1a;border-radius:14px;padding:14px 16px}
+.kpi b{display:block;font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:600}
+.kpi small{color:#999;font-size:11.5px}
+.champs{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:36px}
+.champ{background:#fff;border-radius:16px;padding:18px 20px;border:1px solid #E8E4DC}
+.champ .t{font-size:12px;color:#999}.champ .n{font-family:'Noto Serif TC',serif;font-size:20px;font-weight:700;margin:4px 0}
+.champ .v{font-family:'Space Grotesk',sans-serif;font-size:18px;color:#008C7A;font-weight:600}
+.overview{background:#fff;border-left:5px solid #008C7A;border-radius:14px;padding:22px 26px;margin-bottom:36px}
+.section{margin-bottom:46px}
+.sh{display:flex;align-items:baseline;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.sh h2{font-family:'Noto Serif TC',serif;font-size:22px}
+.sh small{color:#999;font-size:12px}
+.cat-top{background:#fff;border-radius:16px;padding:20px 20px 0;border:1px solid #E8E4DC;margin-bottom:14px}
+.podium{display:flex;justify-content:center;align-items:flex-end;gap:14px}
+.pod{width:200px;text-align:center}
+.pod-name{font-weight:700;font-size:15px}.pod-val{font-family:'Space Grotesk',sans-serif;font-size:13px;color:#555;margin-bottom:6px}
+.pod-bar{border-radius:10px 10px 0 0;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;color:#fff;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600}
+.pod-bar.r0{background:#B08968}.pod-bar.r1{background:#9C9C9C}.pod-bar.r2{background:#A9765A}
+.dgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.dcard{background:#fff;border-radius:16px;padding:18px;border:1px solid #E8E4DC;border-top:4px solid #B08968}
+.dcard.r1{border-top-color:#9C9C9C}.dcard.r2{border-top-color:#A9765A}
+.dc-h{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.rk{width:28px;height:28px;border-radius:14px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;background:#B08968}
+.rk.r1{background:#9C9C9C}.rk.r2{background:#A9765A}
+.dc-n{font-family:'Noto Serif TC',serif;font-weight:700;font-size:16px}
+.dc-m{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:600;margin-bottom:10px}
+.dc-m small{display:block;font-family:'Noto Sans TC',sans-serif;font-size:11px;color:#999;font-weight:400}
+.lab{display:block;font-size:11px;color:#999;margin:8px 0 4px}
+.mbars{display:flex;gap:8px;align-items:flex-end;height:80px;padding-top:14px}
+.mbars div{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.mbars em{font-style:normal;font-size:10px;color:#555;font-family:'Space Grotesk',sans-serif}
+.mbars span{width:100%;max-width:30px;background:#008C7A;border-radius:4px 4px 0 0}
+.mbars small{font-size:10px;color:#999}
+.stack{display:flex;gap:2px;height:12px;border-radius:4px;overflow:hidden}
+.stack-l{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:10.5px;color:#666;margin-top:5px}
+.stack-l i,.bl i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:4px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.kv>div{background:#F7F4EE;border-radius:10px;padding:8px 10px}
+.kv b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px}.kv small{font-size:10.5px;color:#999}
+.kv .lab{margin:0 0 2px}
+.ins{margin:10px 0 0 16px;font-size:12px;color:#333;line-height:1.7}
+.gb{display:inline-block;font-size:10px;padding:0 5px;border-radius:4px;margin-right:3px;background:#F0EDE6;color:#B0A98F;font-weight:600}
+.gb.gA{background:#DDE5E2;color:#3D6A63}.gb.gB{background:#EDE4D6;color:#8A5E3C}.gb.gC{background:#E2DDE8;color:#5E4A7A}
+.ai{background:#fff;border-radius:16px;padding:22px 26px;border:1px solid #E8E4DC;margin-top:14px}
+.ai p{margin:0 0 10px;color:#333}.ai h4{font-family:'Noto Serif TC',serif;font-size:15.5px;margin:14px 0 6px;color:#1E1E1C}
+.ai ul,.ai ol{margin:0 0 10px 20px;color:#333}.ai li{margin-bottom:4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.panel{background:#fff;border-radius:16px;padding:20px 22px;border:1px solid #E8E4DC}
+.panel h3{font-size:13px;color:#888;font-weight:500;margin-bottom:4px}
+.panel .head{font-family:'Noto Serif TC',serif;font-size:17px;font-weight:700;margin-bottom:14px}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar-row{display:grid;grid-template-columns:80px 1fr 110px;gap:10px;align-items:center;font-size:12.5px}
+.bt{height:14px;background:#F0EDE6;border-radius:4px;overflow:hidden}.bf{display:block;height:100%;border-radius:0 4px 4px 0}
+.bv{text-align:right;font-family:'Space Grotesk',sans-serif}.bv small{color:#999}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.vs div{background:#F7F4EE;border-radius:12px;padding:14px}.vs b{display:block;font-family:'Space Grotesk',sans-serif;font-size:28px}
+.vs small{color:#999;font-size:11.5px}
+.tl{display:flex;flex-direction:column;gap:8px}
+.tl div{display:flex;gap:12px;align-items:center;background:#fff;border:1px solid #E8E4DC;border-radius:12px;padding:10px 14px}
+.tl i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.tl .d{font-family:'Space Grotesk',sans-serif;color:#666;min-width:110px}
+.next{background:#1E1E1C;color:#EEE;border-radius:18px;padding:26px 30px}
+.next h4{color:#fff;font-family:'Noto Serif TC',serif;margin:14px 0 6px}.next p,.next li{color:#CCC}
+.next ul,.next ol{margin:0 0 10px 20px}.next strong{color:#fff}
+.muted{color:#999}
+@media (max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}.champs,.dgrid,.two{grid-template-columns:1fr}.cover{padding:32px 26px}}
+@media print{body{background:#fff}.section{break-inside:avoid-page}}
+</style></head><body><div class="report">
+
+<div class="cover">
+  <div class="cover-label">HONDA TAIWAN · 粉絲團競賽季報</div>
+  <h1>${esc(rangeLabel)}<br/>粉絲團季報</h1>
+  <div class="cover-sub">${esc(scopeLabel)}</div>
+  <div class="kpis">
+    <div class="kpi"><b>${totals.dealers}</b><small>納入經銷商</small></div>
+    <div class="kpi"><b>${totals.posts.toLocaleString()}</b><small>季度貼文</small></div>
+    <div class="kpi"><b>${totals.eng.toLocaleString()}</b><small>總互動</small></div>
+    <div class="kpi"><b>${totals.growth >= 0 ? "+" : ""}${totals.growth.toLocaleString()}</b><small>粉絲淨增</small></div>
+    <div class="kpi"><b>${overall.star.n}</b><small>點子王貼文</small></div>
+  </div>
+</div>
+
+<div class="champs">
+  ${[["粉絲成長王", "growth", growthRows[0]], ["互動王（篇均互動數）", "avg", avgRows[0]], ["互動王（篇均互動率）", "rate", rateRows[0]]].map(([t, c, r]) => `
+  <div class="champ"><div class="t">👑 ${t}</div><div class="n">${r ? esc(r.page.name) : "—"}</div><div class="v">${r ? esc(metric(c, r)) : ""}</div></div>`).join("")}
+</div>
+
+${aiOverview ? `<div class="overview">${aiOverview}</div>` : ""}
+
+${catBlock("growth", "粉絲成長王 · 前三名", growthRows.slice(0, 3), aiGrowth, "季末最新 − 季初最舊粉絲數")}
+${catBlock("avg", "互動王（篇均互動數）· 前三名", avgRows.slice(0, 3), aiAvg, "總互動 ÷ 總篇數")}
+${catBlock("rate", "互動王（篇均互動率）· 前三名", rateRows.slice(0, 3), aiRate, "中位數互動 ÷ 粉絲數 × 100%")}
+
+<section class="section">
+  <div class="sh"><h2>貼文類型效益</h2><small>全體納入貼文 ${overall.n} 篇</small></div>
+  <div class="two">
+    <div class="panel"><h3>貼文形式 × 篇均互動</h3><div class="head">${overall.bestFormat ? `${formatLabel(overall.bestFormat.f)}最吸互動（${MIN_FORMAT_N} 篇以上比較）` : ""}</div>${bars(formatItems)}</div>
+    <div class="panel"><h3>內容標籤 × 篇均互動（3 篇以上）</h3><div class="head">${tagItems[0] ? `「${esc(tagItems[0].label)}」效果最好` : ""}</div>${tagItems.length ? bars(tagItems) : `<p class="muted">資料不足</p>`}</div>
+    <div class="panel"><h3>⭐ 點子王 vs 一般貼文</h3><div class="head">${starRatio ? `點子王互動是一般貼文的 ${starRatio} 倍` : "本季無點子王貼文"}</div>
+      <div class="vs"><div><small>點子王 均互動</small><b>${fmt1(overall.star.avg)}</b><small>${overall.star.n} 篇・總 ${overall.star.total.toLocaleString()}</small></div>
+      <div><small>一般貼文 均互動</small><b>${fmt1(overall.nonStarAvg)}</b><small>${overall.n - overall.star.n} 篇</small></div></div></div>
+    <div class="panel"><h3>每月總互動</h3><div class="head">${monthStats.length ? `${parseInt([...monthStats].sort((a, b) => b.total - a.total)[0].m.slice(5))}月互動最高` : ""}</div>
+      <div class="mbars" style="height:120px">${monthStats.map((b) => `<div><em>${b.total.toLocaleString()}</em><span style="height:${Math.max((b.total / mMax) * 80, 2)}px;max-width:56px"></span><small>${parseInt(b.m.slice(5))}月・${b.n}篇</small></div>`).join("")}</div></div>
+  </div>
+  ${aiFormat ? `<div class="ai">${aiFormat}</div>` : ""}
+</section>
+
+${qEvents.length ? `<section class="section">
+  <div class="sh"><h2>官方活動</h2><small>共 ${qEvents.length} 項</small></div>
+  <div class="tl">${qEvents.map((e) => `<div><i style="background:${eventType(e.type).color}"></i><span class="d">${esc(e.start)}${eventEnd(e) !== e.start ? " ~ " + esc(eventEnd(e).slice(5)) : ""}</span><b>${esc(e.title)}</b><span class="muted">${esc(eventType(e.type).label)}${e.note ? "・" + esc(e.note) : ""}</span></div>`).join("")}</div>
+  ${aiEvents ? `<div class="ai">${aiEvents}</div>` : ""}
+</section>` : ""}
+
+${aiNext ? `<section class="section"><div class="sh"><h2>下季建議</h2></div><div class="next">${aiNext}</div></section>` : ""}
+
+${rest.map((s) => `<section class="section"><div class="sh"><h2>${esc(s.title || "補充說明")}</h2></div><div class="ai">${mdLiteToHtml(s.body)}</div></section>`).join("")}
+
+<p class="muted" style="font-size:11.5px;margin-top:20px">互動 = 讚＋留言＋分享。資料來源：Honda 粉絲團監測站。</p>
+</div></body></html>`;
 }
 
 /* ── HTML Report Builder ── */
@@ -3660,7 +4636,7 @@ function BarChartCard({ title, items, onDownloadName, unit, allowNegative }) {
   );
 }
 
-function TrendView({ pages, fanRecords, posts, groupRecords }) {
+function TrendView({ pages, fanRecords, posts, groupRecords, events }) {
   const allMonths = useMemo(() => {
     const set = new Set(posts.map((p) => p.month));
     Object.values(fanRecords).forEach((entries) => {
@@ -4050,7 +5026,7 @@ function TrendView({ pages, fanRecords, posts, groupRecords }) {
 
           <SourceTypeChartSection pages={pages} posts={posts} allMonths={allMonths} />
           <ContentDistChartSection pages={pages} posts={posts} allMonths={allMonths} />
-          <PostDetailChartSection pages={pages} posts={posts} allMonths={allMonths} />
+          <PostDetailChartSection pages={pages} posts={posts} allMonths={allMonths} events={events} />
         </>
       )}
     </div>
@@ -4300,8 +5276,10 @@ function ContentDistChartSection({ pages, posts, allMonths }) {
 }
 
 /* ---------------- Single-page single-month post detail chart (date-level) ---------------- */
-function PostDetailChartSection({ pages, posts, allMonths }) {
+function PostDetailChartSection({ pages, posts, allMonths, events }) {
   const [detailPageId, setDetailPageId] = useState(pages[0]?.id || "");
+  const [showEvents, setShowEvents] = useState(true);
+  const [hiddenEventIds, setHiddenEventIds] = useState([]);
   const [detailMonth, setDetailMonth] = useState(allMonths[allMonths.length - 1] || "");
   const [detailMetric, setDetailMetric] = useState("engagement");
   const svgRef = useRef(null);
@@ -4323,12 +5301,17 @@ function PostDetailChartSection({ pages, posts, allMonths }) {
   const detailPage = pages.find((p) => p.id === detailPageId);
   const metricInfo = POST_METRICS.find((m) => m.value === detailMetric) || POST_METRICS[1];
 
+  const monthEvents = useMemo(() => eventsInMonths(events, detailMonth ? [detailMonth] : []), [events, detailMonth]);
+  const visibleEvents = showEvents ? monthEvents.filter((e) => !hiddenEventIds.includes(e.id)) : [];
+  const eventFor = (p) => visibleEvents.find((e) => p.date >= e.start && p.date <= eventEnd(e));
+
   const leftMargin = 64;
   const pointGap = 110;
   const width = Math.max(detailPosts.length * pointGap + leftMargin + 60, 480);
-  const height = 320;
-  const chartTop = 24;
-  const chartBottom = 240;
+  const eventBand = visibleEvents.length ? 22 * Math.min(visibleEvents.length, 3) + 8 : 0;
+  const height = 320 + eventBand;
+  const chartTop = 24 + eventBand;
+  const chartBottom = 240 + eventBand;
   const chartH = chartBottom - chartTop;
 
   const values = detailPosts.map((p) => {
@@ -4338,6 +5321,31 @@ function PostDetailChartSection({ pages, posts, allMonths }) {
   });
   const maxVal = Math.max(...values, 1);
   const yTicks = [0, 0.25, 0.5, 0.75, 1];
+
+  // Map each visible event onto the per-post x axis (posts are evenly spaced, sorted by date)
+  const xs = detailPosts.map((_, i) => leftMargin + 55 + i * pointGap);
+  const eventShapes = visibleEvents.map((e, k) => {
+    const idx = detailPosts.map((p, i) => (p.date >= e.start && p.date <= eventEnd(e) ? i : -1)).filter((i) => i >= 0);
+    const t = eventType(e.type);
+    const labelY = 16 + (k % 3) * 22;
+    if (idx.length) {
+      const x1 = xs[idx[0]] - pointGap / 2 + 6, x2 = xs[idx[idx.length - 1]] + pointGap / 2 - 6;
+      return { e, t, band: true, x1, x2, labelY, count: idx.length };
+    }
+    let ins = detailPosts.findIndex((p) => p.date > eventEnd(e));
+    if (ins < 0) ins = detailPosts.length;
+    const x = ins === 0 ? leftMargin + 14 : ins === detailPosts.length ? (xs[ins - 1] || leftMargin) + pointGap / 2 : (xs[ins - 1] + xs[ins]) / 2;
+    return { e, t, band: false, x1: x, x2: x, labelY, count: 0 };
+  });
+
+  // In-event vs outside comparison for the selected metric
+  const cmp = (() => {
+    if (!visibleEvents.length || !detailPosts.length) return null;
+    const inV = [], outV = [];
+    detailPosts.forEach((p, i) => (eventFor(p) ? inV : outV).push(values[i]));
+    const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+    return { inN: inV.length, outN: outV.length, inAvg: avg(inV), outAvg: avg(outV) };
+  })();
 
   return (
     <>
@@ -4368,6 +5376,23 @@ function PostDetailChartSection({ pages, posts, allMonths }) {
             </div>
           </Field>
         </div>
+        <div style={{ borderTop: "1px solid #E6E1D6", marginTop: 14, paddingTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, color: "#5C5847", cursor: "pointer", marginRight: 4 }}>
+            <input type="checkbox" checked={showEvents} onChange={(e) => setShowEvents(e.target.checked)} style={{ accentColor: "#8A9A8E" }} />
+            <Icon name="calendar" size={15} />顯示官方活動
+          </label>
+          {monthEvents.length === 0 ? (
+            <span style={{ fontSize: 12.5, color: "#A6A096" }}>這個月沒有官方活動紀錄（可在「本月輸入 → 官方活動」新增）</span>
+          ) : showEvents ? (
+            <>
+              {monthEvents.map((e) => (
+                <EventChip key={e.id} e={e} muted={hiddenEventIds.includes(e.id)}
+                  onClick={() => setHiddenEventIds((ids) => (ids.includes(e.id) ? ids.filter((x) => x !== e.id) : [...ids, e.id]))} />
+              ))}
+              <span style={{ fontSize: 11.5, color: "#A6A096" }}>點活動可單獨隱藏／顯示</span>
+            </>
+          ) : <span style={{ fontSize: 12.5, color: "#A6A096" }}>已隱藏 {monthEvents.length} 項活動</span>}
+        </div>
       </div>
 
       <div style={styles.card}>
@@ -4395,6 +5420,27 @@ function PostDetailChartSection({ pages, posts, allMonths }) {
         ) : (
           <div style={{ overflowX: "auto" }}>
             <svg ref={svgRef} width={width} height={height} style={{ display: "block", background: "#FBF9F4" }}>
+              {eventShapes.map(({ e, t, band, x1, x2, labelY }) => (
+                <g key={e.id}>
+                  <title>{`${e.title}｜${t.label}｜${eventRangeLabel(e)}${e.note ? "｜" + e.note : ""}`}</title>
+                  {band
+                    ? <rect x={x1} y={chartTop - 6} width={Math.max(x2 - x1, 4)} height={chartBottom - chartTop + 6} fill={t.color} opacity={0.1} rx={4} />
+                    : <line x1={x1} x2={x1} y1={chartTop - 6} y2={chartBottom} stroke={t.color} strokeWidth={1.5} strokeDasharray="4 4" />}
+                  <line x1={x1} x2={x1} y1={labelY + 6} y2={chartTop - 6} stroke={t.color} strokeWidth={1} opacity={0.6} />
+                  {(() => {
+                    const name = e.title.length > 14 ? e.title.slice(0, 14) + "…" : e.title;
+                    const range = eventRangeLabel(e);
+                    const w = name.length * 11.5 + range.length * 6.6 + 18;
+                    const lx = Math.max(Math.min(x1, width - w - 4), 4);
+                    return (
+                      <>
+                        <rect x={lx} y={labelY - 8} width={w} height={18} rx={4} fill={t.color} />
+                        <text x={lx + 6} y={labelY + 5} fontSize={11} fill="#fff" fontWeight={500}>{name} {range}</text>
+                      </>
+                    );
+                  })()}
+                </g>
+              ))}
               {yTicks.map((t, i) => {
                 const y = chartBottom - t * chartH;
                 const val = Math.round(maxVal * t);
@@ -4420,6 +5466,7 @@ function PostDetailChartSection({ pages, posts, allMonths }) {
                     <path d={path} fill="none" stroke="#8A9A8E" strokeWidth={2} />
                     {points.map((p, i) => (
                       <g key={i}>
+                        {eventFor(p.post) && <circle cx={p.x} cy={p.y} r={8} fill="none" stroke={eventType(eventFor(p.post).type).color} strokeWidth={2} />}
                         <circle cx={p.x} cy={p.y} r={4.5} fill="#8A9A8E" />
                         <text x={p.x} y={p.y - 12} textAnchor="middle" fontSize={11} fill="#5C6B73" fontWeight={600} fontFamily="'Space Grotesk', sans-serif">
                           {formatChartNum(p.v)}
@@ -4428,7 +5475,7 @@ function PostDetailChartSection({ pages, posts, allMonths }) {
                           {p.post.date?.slice(5)}
                         </text>
                         <text x={p.x} y={chartBottom + 38} textAnchor="middle" fontSize={10} fill="#A6A096">
-                          {POST_TYPES.find((t) => t.value === p.post.type)?.label}
+                          {formatLabel(formatOf(p.post))}
                         </text>
                       </g>
                     ))}
@@ -4437,6 +5484,22 @@ function PostDetailChartSection({ pages, posts, allMonths }) {
               })()}
             </svg>
             <div style={styles.hint}>X軸為貼文發布日期（月-日），每個點代表一篇獨立貼文；同一天若有多篇貼文，會依序並排顯示。</div>
+            {cmp && (
+              <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+                {[["活動期間貼文", cmp.inN, cmp.inAvg, "#B87420"], ["非活動期間貼文", cmp.outN, cmp.outAvg, "#8A9A8E"]].map(([l, n, v, c]) => (
+                  <div key={l} style={{ flex: "1 1 200px", background: "#F7F4EE", borderRadius: 12, padding: "12px 16px", borderLeft: `4px solid ${c}` }}>
+                    <div style={{ fontSize: 12, color: "#9C9684" }}>{l}（{n} 篇）· 平均{metricInfo.label}</div>
+                    <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 24, fontWeight: 600, color: "#33312C" }}>{v == null ? "—" : fmtNum(v, 1)}</div>
+                  </div>
+                ))}
+                {cmp.inAvg != null && cmp.outAvg > 0 && (
+                  <div style={{ flex: "1 1 200px", alignSelf: "center", fontSize: 13, color: "#5C5847", lineHeight: 1.6 }}>
+                    活動期間平均是非活動期間的 <b style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{(cmp.inAvg / cmp.outAvg).toFixed(1)} 倍</b>
+                    <div style={{ fontSize: 11.5, color: "#A6A096" }}>有色圈的點＝落在活動期間的貼文；篇數少時僅供參考</div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -4503,7 +5566,7 @@ function MonthSwitcher({ month, setMonth }) {
 }
 
 /* ============================================================ Settings & Backup ============================================================ */
-function SettingsView({ pages, fanRecords, posts, groupRecords, savePages, saveFanRecords, savePosts, saveGroupRecords, showToast }) {
+function SettingsView({ pages, fanRecords, posts, groupRecords, events, savePages, saveFanRecords, savePosts, saveGroupRecords, saveEvents, showToast }) {
   const [pendingRestore, setPendingRestore] = useState(null);
   const [restoreError, setRestoreError] = useState("");
   const restoreInputRef = useRef(null);
@@ -4511,7 +5574,7 @@ function SettingsView({ pages, fanRecords, posts, groupRecords, savePages, saveF
   const exportBackup = () => {
     const blob = new Blob([JSON.stringify({
       app: "fbmonitor", version: 1, exportedAt: new Date().toISOString(),
-      pages, fanRecords, posts, groupRecords,
+      pages, fanRecords, posts, groupRecords, events,
     }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -4544,6 +5607,8 @@ function SettingsView({ pages, fanRecords, posts, groupRecords, savePages, saveF
     saveFanRecords(pendingRestore.fanRecords || {});
     savePosts(pendingRestore.posts || []);
     saveGroupRecords(pendingRestore.groupRecords || {});
+    // older backups have no events field — keep current events instead of wiping them
+    if (Array.isArray(pendingRestore.events)) saveEvents(pendingRestore.events);
     showToast("已從備份還原所有資料");
     setPendingRestore(null);
   };
@@ -4575,12 +5640,13 @@ function SettingsView({ pages, fanRecords, posts, groupRecords, savePages, saveF
         <StatCard icon="spark" label="貼文紀錄筆數" value={stats.posts.toLocaleString()} />
         <StatCard icon="users" label="粉絲數量測紀錄" value={stats.fanEntries.toLocaleString()} />
         <StatCard icon="trend" label="已設定分組月份" value={`${stats.groupMonths} 個月`} />
+        <StatCard icon="calendar" label="官方活動紀錄" value={`${(events || []).length} 筆`} />
       </div>
 
       <SectionTitle icon="save" title="完整資料備份" />
       <div style={styles.card}>
         <p style={{ fontSize: 13.5, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
-          「匯出完整備份」會把所有粉絲團清單、貼文紀錄、粉絲數量測、競賽分組設定打包成一個 JSON 檔案下載。這份備份可以在任何裝置上用「從備份還原」功能完整還原，也適合在 Firebase 出現問題時作為緊急備援。
+          「匯出完整備份」會把所有粉絲團清單、貼文紀錄、粉絲數量測、競賽分組設定、官方活動打包成一個 JSON 檔案下載。這份備份可以在任何裝置上用「從備份還原」功能完整還原，也適合在 Firebase 出現問題時作為緊急備援。
         </p>
         <p style={{ fontSize: 13, color: "#A6A096", lineHeight: 1.6, marginBottom: 20 }}>
           建議每個月月底輸入完資料後匯出一次，存到 Google Drive 或其他地方保存。
@@ -4801,6 +5867,10 @@ const styles = {
   modeBtn: { display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", border: "none", borderRadius: 7, background: "transparent", cursor: "pointer", fontSize: 13.5, fontWeight: 500, color: "#7A7568", fontFamily: "'Noto Sans TC', sans-serif", whiteSpace: "nowrap" },
   modeBtnActive: { background: "#fff", color: "#3A3A38", fontWeight: 600, boxShadow: "0 1px 3px rgba(0,0,0,0.10)" },
   expandBar: { width: "100%", padding: 11, border: "none", background: "#F3F0EA", borderTop: "1px solid #E6E1D6", cursor: "pointer", fontSize: 13, color: "#7A7568", fontFamily: "'Noto Sans TC', sans-serif" },
+  infoTitle: { fontSize: 12.5, color: "#9C9684", marginBottom: 4, fontWeight: 500 },
+  infoHeadline: { fontFamily: "'Noto Serif TC', serif", fontSize: 16, fontWeight: 700, color: "#33312C", marginBottom: 14 },
+  miniLabel: { fontSize: 11, color: "#A6A096", marginBottom: 5 },
+  miniStat: { background: "#F7F4EE", borderRadius: 10, padding: "8px 10px" },
   jumpBar: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" },
   floatNav: { position: "fixed", right: 22, bottom: 22, zIndex: 60, display: "flex", flexDirection: "column", gap: 6, padding: 8, borderRadius: 14, background: "rgba(251,249,244,0.96)", border: "1px solid #E6E1D6", boxShadow: "0 6px 20px rgba(0,0,0,0.12)" },
   jumpBtn: { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 13px", borderRadius: 999, border: "1px solid #DDD6C6", background: "#fff", color: "#5C5847", fontSize: 12.5, cursor: "pointer", fontFamily: "'Noto Sans TC', sans-serif" },
