@@ -1862,133 +1862,227 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events
 }
 
 /* ============================================================ 官方活動（本月輸入 → 官方活動分頁） ============================================================ */
+function EventFormFields({ draft, setDraft }) {
+  return (
+    <>
+      <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "2fr 1fr 1fr" }}>
+        <Field label="活動名稱">
+          {/* No Enter-to-submit: Chinese IME uses Enter to confirm characters */}
+          <input style={styles.input} value={draft.title} placeholder="例如：中秋節、CR-V 新車發表"
+            onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+        </Field>
+        <Field label="開始日期">
+          <input type="date" style={styles.input} value={draft.start} onChange={(e) => setDraft({ ...draft, start: e.target.value })} />
+        </Field>
+        <Field label="結束日期（檔期才填）">
+          <input type="date" style={styles.input} value={draft.end} min={draft.start} onChange={(e) => setDraft({ ...draft, end: e.target.value })} />
+        </Field>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 14, marginTop: 12, alignItems: "end" }}>
+        <Field label="類型">
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {EVENT_TYPES.map((t) => {
+              const on = draft.type === t.value;
+              return (
+                <button key={t.value} type="button" onClick={() => setDraft({ ...draft, type: t.value })}
+                  style={{ ...styles.chipBtn, display: "inline-flex", alignItems: "center", gap: 6, ...(on ? { background: "#fff", borderColor: t.color, color: "#3A3A38", fontWeight: 600, boxShadow: `inset 0 0 0 1px ${t.color}` } : {}) }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 2, background: t.color }} />{t.label}
+                </button>
+              );
+            })}
+          </div>
+        </Field>
+        <Field label="備註（選填）">
+          <input style={styles.input} value={draft.note} placeholder="例如：全台展間同步、官方廣告投放期間" onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
+        </Field>
+      </div>
+    </>
+  );
+}
+
+const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
+const weekdayOf = (d) => new Date(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)).getDay(); // local, no UTC shift
+let __measureCtx = null;
+function textWidth(text, font = "500 12px 'Noto Sans TC', sans-serif") {
+  if (!__measureCtx) __measureCtx = document.createElement("canvas").getContext("2d");
+  __measureCtx.font = font;
+  return __measureCtx.measureText(text).width;
+}
+
+function EventTimeline({ list, month, onPick }) {
+  const wrapRef = useRef(null);
+  const [wrapW, setWrapW] = useState(900);
+  useEffect(() => {
+    const el = wrapRef.current; if (!el) return;
+    const ro = new ResizeObserver(() => setWrapW(el.clientWidth));
+    ro.observe(el); setWrapW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  const y = Number(month.slice(0, 4)), mo = Number(month.slice(5, 7));
+  const days = new Date(y, mo, 0).getDate();
+  const dayW = Math.max(wrapW / days, 30);
+  const totalW = dayW * days;
+  const monthStart = `${month}-01`, monthEnd = `${month}-${String(days).padStart(2, "0")}`;
+  const dayIdx = (date) => (date < monthStart ? 0 : date > monthEnd ? days - 1 : Number(date.slice(8, 10)) - 1);
+
+  // Label box width follows the text; lanes avoid overlap of box OR date span
+  const LANE_H = 34;
+  const laneEnds = [];
+  const placed = list.map((e) => {
+    const s = dayIdx(e.start), en = dayIdx(eventEnd(e));
+    const left = s * dayW + 2;
+    const spanW = (en - s + 1) * dayW - 4;
+    const label = `${e.title}${eventEnd(e) !== e.start ? `　${eventRangeLabel(e)}` : ""}`;
+    const boxW = textWidth(label) + 20;
+    const boxLeft = Math.min(left, totalW - boxW - 2);
+    const right = Math.max(left + spanW, boxLeft + boxW) + 4;
+    let lane = laneEnds.findIndex((end) => end <= Math.min(left, boxLeft));
+    if (lane < 0) { lane = laneEnds.length; laneEnds.push(right); } else laneEnds[lane] = right;
+    return { e, left, spanW, boxLeft, boxW, label, lane, multi: en > s };
+  });
+  const headerH = 40;
+  const bodyH = Math.max(laneEnds.length, 1) * LANE_H + 12;
+
+  return (
+    <div ref={wrapRef} style={{ overflowX: "auto", borderRadius: 10, border: "1px solid #E6E1D6" }}>
+      <div style={{ position: "relative", width: totalW, height: headerH + bodyH, background: "#FBF9F4" }}>
+        {Array.from({ length: days }, (_, i) => {
+          const wd = new Date(y, mo - 1, i + 1).getDay();
+          const weekend = wd === 0 || wd === 6;
+          return (
+            <div key={i} style={{ position: "absolute", left: i * dayW, width: dayW, top: 0, bottom: 0,
+              background: weekend ? "#F1ECE2" : "transparent", borderLeft: wd === 1 ? "1px solid #D8D0C0" : "1px solid #F0EBE1" }}>
+              <div style={{ height: headerH, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderBottom: "1px solid #E6E1D6", lineHeight: 1.25 }}>
+                <span style={{ fontSize: 11.5, fontFamily: "'Space Grotesk', sans-serif", color: weekend ? "#B08968" : "#5C5847", fontWeight: wd === 1 ? 600 : 400 }}>{i + 1}</span>
+                <span style={{ fontSize: 10, color: weekend ? "#B08968" : "#A6A096" }}>{WEEKDAYS[wd]}</span>
+              </div>
+            </div>
+          );
+        })}
+        {placed.map(({ e, left, spanW, boxLeft, boxW, label, lane, multi }) => {
+          const t = eventType(e.type);
+          const top = headerH + 8 + lane * LANE_H;
+          return (
+            <div key={e.id} onClick={() => onPick(e)} title={`${e.title}｜${t.label}｜${e.start}${eventEnd(e) !== e.start ? " ~ " + eventEnd(e) : ""}${e.note ? "｜" + e.note : ""}（點擊修改）`}
+              style={{ cursor: "pointer" }}>
+              {multi && <div style={{ position: "absolute", left, width: spanW, top: top + 22, height: 4, borderRadius: 2, background: t.color, opacity: 0.45 }} />}
+              <div style={{ position: "absolute", left: boxLeft, width: boxW, top, height: 22, borderRadius: 6, background: t.color, color: "#fff",
+                fontSize: 12, fontWeight: 500, display: "flex", alignItems: "center", padding: "0 10px", whiteSpace: "nowrap", boxShadow: "0 1px 2px rgba(0,0,0,0.12)" }}>
+                {label}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function EventsPanel({ events, saveEvents, month, showToast }) {
   const blank = { title: "", type: "season", start: `${month}-01`, end: "", note: "" };
   const [draft, setDraft] = useState(blank);
-  const [editingId, setEditingId] = useState(null);
+  const [editing, setEditing] = useState(null); // { id, draft }
   const [pendingDelete, setPendingDelete] = useState(null);
 
-  useEffect(() => { if (!editingId) setDraft((d) => ({ ...d, start: `${month}-01`, end: "" })); }, [month]);
+  useEffect(() => { setDraft((d) => ({ ...d, start: `${month}-01`, end: "" })); }, [month]);
 
   const list = useMemo(() => eventsInMonths(events, [month]), [events, month]);
-  const daysInMonth = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
 
-  const submit = () => {
-    if (!draft.title.trim()) { showToast("請輸入活動名稱"); return; }
-    if (!draft.start) { showToast("請選擇日期"); return; }
-    const end = draft.end && draft.end > draft.start ? draft.end : "";
-    if (editingId) {
-      saveEvents(events.map((e) => (e.id === editingId ? { ...e, ...draft, title: draft.title.trim(), end } : e)));
-      showToast("已更新官方活動");
-    } else {
-      saveEvents([...(events || []), { id: uid(), ...draft, title: draft.title.trim(), end, createdAt: Date.now() }]);
-      showToast("已新增官方活動");
-    }
-    setEditingId(null);
+  const clean = (d) => ({ ...d, title: d.title.trim(), end: d.end && d.end > d.start ? d.end : "" });
+  const valid = (d) => {
+    if (!d.title.trim()) { showToast("請輸入活動名稱"); return false; }
+    if (!d.start) { showToast("請選擇開始日期"); return false; }
+    return true;
+  };
+  const addEvent = () => {
+    if (!valid(draft)) return;
+    saveEvents([...(events || []), { id: uid(), ...clean(draft), createdAt: Date.now() }]);
+    showToast("已新增官方活動");
     setDraft({ ...blank, type: draft.type, start: draft.start });
   };
-
-  const startEdit = (e) => { setEditingId(e.id); setDraft({ title: e.title, type: e.type, start: e.start, end: e.end || "", note: e.note || "" }); };
-  const cancelEdit = () => { setEditingId(null); setDraft(blank); };
-
-  // month timeline geometry: day d → % position
-  const pos = (date) => {
-    if (date < `${month}-01`) return 0;
-    if (date > `${month}-${String(daysInMonth).padStart(2, "0")}`) return 100;
-    return ((Number(date.slice(8, 10)) - 1) / daysInMonth) * 100;
+  const openEdit = (e) => setEditing({ id: e.id, draft: { title: e.title, type: e.type, start: e.start, end: e.end || "", note: e.note || "" } });
+  const saveEdit = () => {
+    if (!valid(editing.draft)) return;
+    saveEvents(events.map((e) => (e.id === editing.id ? { ...e, ...clean(editing.draft) } : e)));
+    showToast("已更新官方活動");
+    setEditing(null);
   };
-  const lanes = [];
-  const placed = list.map((e) => {
-    const l = pos(e.start);
-    const r = Math.max(pos(eventEnd(e)) + 100 / daysInMonth, l + Math.min(e.title.length * 1.2 + 1.6, 15)); // keep room for the label
-    let lane = lanes.findIndex((end) => end <= l);
-    if (lane < 0) { lane = lanes.length; lanes.push(r); } else lanes[lane] = r;
-    return { e, l, w: Math.max(r - l, 100 / daysInMonth), lane };
-  });
 
   return (
     <>
       {pendingDelete && (
-        <ConfirmDialog title="刪除官方活動" message={`確定要刪除「${pendingDelete.title}」嗎？`}
-          onConfirm={() => { saveEvents(events.filter((e) => e.id !== pendingDelete.id)); setPendingDelete(null); showToast("已刪除"); }}
+        <ConfirmDialog title="刪除官方活動" message={`確定要刪除「${pendingDelete.title}」嗎？刪除後無法復原。`}
+          onConfirm={() => { saveEvents(events.filter((e) => e.id !== pendingDelete.id)); setPendingDelete(null); setEditing(null); showToast("已刪除"); }}
           onCancel={() => setPendingDelete(null)} />
+      )}
+
+      {editing && !pendingDelete && (
+        <div style={styles.modalOverlay} onClick={(ev) => ev.target === ev.currentTarget && setEditing(null)}>
+          <div style={{ ...styles.modalCard, maxWidth: 760, width: "92vw" }}>
+            <div style={styles.modalHeader}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <Icon name="edit" size={17} />
+                <span style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 17 }}>修改官方活動</span>
+              </div>
+              <button style={styles.iconBtn} onClick={() => setEditing(null)}><Icon name="x" size={18} /></button>
+            </div>
+            <div style={styles.modalBody}>
+              <EventFormFields draft={editing.draft} setDraft={(d) => setEditing({ ...editing, draft: d })} />
+            </div>
+            <div style={{ ...styles.modalFooter, justifyContent: "space-between" }}>
+              <button style={{ ...styles.secondaryBtn, color: "#C08081" }} onClick={() => setPendingDelete(events.find((e) => e.id === editing.id))}>
+                <Icon name="trash" size={15} />刪除
+              </button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button style={styles.secondaryBtn} onClick={() => setEditing(null)}>取消</button>
+                <button style={styles.primaryBtn} onClick={saveEdit}><Icon name="save" size={16} />儲存修改</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       <div style={styles.card}>
         <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.7, marginTop: 0 }}>
           記錄 Honda 官方的季節檔期、節慶、新車發表日、促銷活動。這是全體經銷商共用的時間軸，會顯示在「趨勢總覽 → 單月貼文明細」圖表上，並自動帶入月報／季報的 AI 提示詞。單日活動只填開始日期；檔期活動再加上結束日期。
         </p>
-        <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "2fr 1fr 1fr" }}>
-          <Field label="活動名稱">
-            <input style={styles.input} value={draft.title} placeholder="例如：中秋節、CR-V 新車發表"
-              onChange={(e) => setDraft({ ...draft, title: e.target.value })} onKeyDown={(e) => e.key === "Enter" && submit()} />
-          </Field>
-          <Field label="開始日期">
-            <input type="date" style={styles.input} value={draft.start} onChange={(e) => setDraft({ ...draft, start: e.target.value })} />
-          </Field>
-          <Field label="結束日期（檔期才填）">
-            <input type="date" style={styles.input} value={draft.end} min={draft.start} onChange={(e) => setDraft({ ...draft, end: e.target.value })} />
-          </Field>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 14, marginTop: 12, alignItems: "end" }}>
-          <Field label="類型">
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {EVENT_TYPES.map((t) => {
-                const on = draft.type === t.value;
-                return (
-                  <button key={t.value} type="button" onClick={() => setDraft({ ...draft, type: t.value })}
-                    style={{ ...styles.chipBtn, display: "inline-flex", alignItems: "center", gap: 6, ...(on ? { background: "#fff", borderColor: t.color, color: "#3A3A38", fontWeight: 600, boxShadow: `inset 0 0 0 1px ${t.color}` } : {}) }}>
-                    <span style={{ width: 9, height: 9, borderRadius: 2, background: t.color }} />{t.label}
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
-          <Field label="備註（選填）">
-            <input style={styles.input} value={draft.note} placeholder="例如：全台展間同步、官方廣告投放期間" onChange={(e) => setDraft({ ...draft, note: e.target.value })} />
-          </Field>
-        </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-          <button style={styles.primaryBtn} onClick={submit}><Icon name={editingId ? "save" : "plus"} size={16} />{editingId ? "儲存修改" : "新增活動"}</button>
-          {editingId && <button style={styles.secondaryBtn} onClick={cancelEdit}>取消修改</button>}
+        <EventFormFields draft={draft} setDraft={setDraft} />
+        <div style={{ marginTop: 14 }}>
+          <button style={styles.primaryBtn} onClick={addEvent}><Icon name="plus" size={16} />新增活動</button>
         </div>
       </div>
 
       <div style={styles.card}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
           <div style={{ fontSize: 13.5, fontWeight: 600, color: "#3A3A38" }}>{monthLabel(month)} 活動時間軸</div>
-          <div style={{ fontSize: 12, color: "#A6A096" }}>共 {list.length} 項</div>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 11.5, color: "#A6A096" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 10, background: "#F1ECE2", border: "1px solid #E6E1D6" }} />週末</span>
+            <span>深色直線＝週一</span>
+            <span>點活動可修改 · 共 {list.length} 項</span>
+          </div>
         </div>
         {list.length === 0 ? <EmptyState text="這個月還沒有官方活動紀錄。" /> : (
           <>
-            <div style={{ position: "relative", height: lanes.length * 30 + 26, background: "#F7F4EE", borderRadius: 10, overflow: "hidden" }}>
-              {[1, 8, 15, 22, 29].filter((d) => d <= daysInMonth).map((d) => (
-                <div key={d} style={{ position: "absolute", left: `${((d - 1) / daysInMonth) * 100}%`, top: 0, bottom: 0, borderLeft: "1px dashed #E0DACE" }}>
-                  <span style={{ position: "absolute", bottom: 4, left: 4, fontSize: 10.5, color: "#A6A096", whiteSpace: "nowrap" }}>{d}日</span>
-                </div>
-              ))}
-              {placed.map(({ e, l, w, lane }) => (
-                <div key={e.id} onClick={() => startEdit(e)} title={`${e.title}｜${eventRangeLabel(e)}${e.note ? "｜" + e.note : ""}`}
-                  style={{ position: "absolute", left: `${Math.min(l, 88)}%`, width: `${w}%`, minWidth: Math.min(e.title.length * 12 + 16, 150), top: 6 + lane * 30, height: 24, borderRadius: 6, cursor: "pointer",
-                    background: eventType(e.type).color, color: "#fff", fontSize: 11.5, padding: "3px 7px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {e.title}
-                </div>
-              ))}
-            </div>
+            <EventTimeline list={list} month={month} onPick={openEdit} />
             <table style={{ ...styles.table, marginTop: 14 }}>
               <thead><tr>
-                <th style={styles.th}>日期</th><th style={styles.th}>活動</th><th style={styles.th}>類型</th><th style={styles.th}>備註</th><th style={{ ...styles.th, width: 80 }} />
+                <th style={styles.th}>日期</th><th style={styles.th}>活動</th><th style={styles.th}>類型</th><th style={styles.th}>備註</th><th style={{ ...styles.th, width: 150 }} />
               </tr></thead>
               <tbody>
                 {list.map((e) => (
-                  <tr key={e.id} style={{ ...styles.tr, ...(editingId === e.id ? { background: "#FBF5EC" } : {}) }}>
-                    <td style={{ ...styles.td, fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap" }}>{e.start}{eventEnd(e) !== e.start && <span style={{ color: "#A6A096" }}> ~ {eventEnd(e).slice(5)}</span>}</td>
+                  <tr key={e.id} style={styles.tr}>
+                    <td style={{ ...styles.td, fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap" }}>
+                      {e.start}（{WEEKDAYS[weekdayOf(e.start)]}）{eventEnd(e) !== e.start && <span style={{ color: "#A6A096" }}> ~ {eventEnd(e).slice(5)}（{WEEKDAYS[weekdayOf(eventEnd(e))]}）</span>}
+                    </td>
                     <td style={{ ...styles.td, fontWeight: 500 }}>{e.title}</td>
                     <td style={styles.td}><span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5 }}><span style={{ width: 9, height: 9, borderRadius: 2, background: eventType(e.type).color }} />{eventType(e.type).label}</span></td>
                     <td style={{ ...styles.td, color: "#7A7568", fontSize: 12.5 }}>{e.note || "—"}</td>
-                    <td style={{ ...styles.td, whiteSpace: "nowrap" }}>
-                      <button style={styles.iconBtn} onClick={() => startEdit(e)} title="修改"><Icon name="edit" size={15} /></button>
-                      <button style={styles.iconBtn} onClick={() => setPendingDelete(e)} title="刪除"><Icon name="trash" size={15} /></button>
+                    <td style={styles.td}>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
+                        <button style={{ ...styles.secondaryBtn, padding: "5px 10px", fontSize: 12.5, whiteSpace: "nowrap" }} onClick={() => openEdit(e)}><Icon name="edit" size={14} />修改</button>
+                        <button style={styles.iconBtn} onClick={() => setPendingDelete(e)} title="刪除"><Icon name="trash" size={15} /></button>
+                      </div>
                     </td>
                   </tr>
                 ))}
