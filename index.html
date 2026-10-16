@@ -23,6 +23,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   html, body { margin: 0; padding: 0; }
   #root { min-height: 100vh; }
@@ -1988,6 +1989,7 @@ function EventsPanel({ events, saveEvents, month, showToast }) {
   useEffect(() => { setDraft((d) => ({ ...d, start: `${month}-01`, end: "" })); }, [month]);
 
   const list = useMemo(() => eventsInMonths(events, [month]), [events, month]);
+  const timelineRef = useRef(null);
 
   const clean = (d) => ({ ...d, title: d.title.trim(), end: d.end && d.end > d.start ? d.end : "" });
   const valid = (d) => {
@@ -2054,8 +2056,10 @@ function EventsPanel({ events, saveEvents, month, showToast }) {
       </div>
 
       <div style={styles.card}>
+        <div ref={timelineRef} style={{ background: "#FBF9F4" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600, color: "#3A3A38" }}>{monthLabel(month)} 活動時間軸</div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: "#3A3A38", display: "flex", alignItems: "center", gap: 10 }}>{monthLabel(month)} 活動時間軸
+            {list.length > 0 && <DownloadImgButton targetRef={timelineRef} name={`${month}_官方活動時間軸`} />}</div>
           <div style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 11.5, color: "#A6A096" }}>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 10, background: "#F1ECE2", border: "1px solid #E6E1D6" }} />週末</span>
             <span>深色直線＝週一</span>
@@ -2065,6 +2069,11 @@ function EventsPanel({ events, saveEvents, month, showToast }) {
         {list.length === 0 ? <EmptyState text="這個月還沒有官方活動紀錄。" /> : (
           <>
             <EventTimeline list={list} month={month} onPick={openEdit} />
+          </>
+        )}
+        </div>
+        {list.length > 0 && (
+          <>
             <table style={{ ...styles.table, marginTop: 14 }}>
               <thead><tr>
                 <th style={styles.th}>日期</th><th style={styles.th}>活動</th><th style={styles.th}>類型</th><th style={styles.th}>備註</th><th style={{ ...styles.th, width: 150 }} />
@@ -2540,6 +2549,8 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
     <div style={styles.viewWrap}>
       <Anchor id="m-top" />
       <FloatNav topId="m-top" items={[
+        { id: "m-champs", label: "各組冠軍", icon: "crown" },
+        { id: "m-charts", label: "月度重點圖表", icon: "chart" },
         { id: "m-growth", label: "粉絲成長排名", icon: "users" },
         { id: "m-posts", label: "貼文互動排名", icon: "trend" },
         { id: "m-star", label: "點子王貼文", icon: "spark" },
@@ -2570,6 +2581,8 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
         />
         <StatCard icon="spark" label="本月貼文紀錄數" value={totals.postCount.toLocaleString()} />
       </div>
+
+      <MonthHighlights pages={pages} posts={posts} fanRecords={fanRecords} groupRecords={groupRecords} month={month} />
 
       <Anchor id="m-growth" />
       <SectionTitle icon="users" title="粉絲人數成長排名 · 貼文互動排名" />
@@ -3122,7 +3135,12 @@ function QuarterReportView({ pages, posts, fanRecords, groupRecords, events, sho
   const thR = { ...styles.th, textAlign: "right" };
   const tdNum = { ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" };
 
+  const exportCtx = {
+    prefix: `季報_${qMode === "fixed" ? `${year}Q${quarter}` : qMonths.map((m) => parseInt(m.slice(5)) + "月").join("")}${groupFilter ? "_" + groupFilter + "組" : ""}`,
+    caption: `Honda 粉絲團監測站｜${rangeLabel}｜${scopeLabel}`,
+  };
   return (
+    <ExportNameCtx.Provider value={exportCtx}>
     <div style={styles.viewWrap}>
       <div id="q-top" />
       <Header title="季報表" subtitle="跨月份統整：粉絲成長王 · 互動王">
@@ -3480,6 +3498,7 @@ function QuarterReportView({ pages, posts, fanRecords, groupRecords, events, sho
         </>
       )}
     </div>
+    </ExportNameCtx.Provider>
   );
 }
 
@@ -3757,19 +3776,16 @@ function QuarterInsightsBase({ overall, monthStats, qEvents }) {
   const bestT = tagItems[0];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 14 }}>
-      <div style={styles.card}>
-        <div style={styles.infoTitle}>貼文形式 × 篇均互動</div>
+      <ExportCard name="貼文形式效益" title={<>貼文形式 × 篇均互動</>}>
         {bestF && <div style={styles.infoHeadline}>{formatLabel(bestF.f)}最吸互動，均 {fmtNum(bestF.avg, 0)}／篇</div>}
         {topRaw && bestF && topRaw.f !== bestF.f && <div style={{ fontSize: 11.5, color: "#A6A096", marginTop: -10, marginBottom: 12 }}>{formatLabel(topRaw.f)}數字更高但只有 {topRaw.n} 篇，不列入結論</div>}
         <HBarList items={formatItems} />
-      </div>
-      <div style={styles.card}>
-        <div style={styles.infoTitle}>內容標籤 × 篇均互動 <span style={{ fontWeight: 400, color: "#A6A096" }}>（3 篇以上）</span></div>
+      </ExportCard>
+      <ExportCard name="內容標籤效益" title={<>內容標籤 × 篇均互動 <span style={{ fontWeight: 400, color: "#A6A096" }}>（3 篇以上）</span></>}>
         {bestT && <div style={styles.infoHeadline}>「{bestT.label}」類效果最好，均 {fmtNum(bestT.value, 0)}／篇</div>}
         {tagItems.length ? <HBarList items={tagItems} /> : <div style={{ fontSize: 12.5, color: "#A6A096" }}>內容標籤資料不足</div>}
-      </div>
-      <div style={styles.card}>
-        <div style={styles.infoTitle}>⭐ 點子王 vs 一般貼文</div>
+      </ExportCard>
+      <ExportCard name="點子王vs一般貼文" title={<>⭐ 點子王 vs 一般貼文</>}>
         {starRatio ? <div style={styles.infoHeadline}>點子王貼文互動是一般貼文的 {starRatio.toFixed(1)} 倍</div> : <div style={styles.infoHeadline}>這段期間沒有點子王貼文</div>}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[["點子王", overall.star.avg, `${overall.star.n} 篇 · 總互動 ${overall.star.total.toLocaleString()}`, "#B08968"],
@@ -3782,9 +3798,8 @@ function QuarterInsightsBase({ overall, monthStats, qEvents }) {
             </div>
           ))}
         </div>
-      </div>
-      <div style={styles.card}>
-        <div style={styles.infoTitle}>每月總互動</div>
+      </ExportCard>
+      <ExportCard name="每月總互動" title={<>每月總互動</>}>
         <div style={styles.infoHeadline}>{monthStats.length ? `${parseInt([...monthStats].sort((a, b) => b.total - a.total)[0].m.slice(5))}月互動最高` : ""}</div>
         <MiniMonthBars byMonth={monthStats} field="total" color="#008C7A" />
         {qEvents.length > 0 && (
@@ -3795,7 +3810,7 @@ function QuarterInsightsBase({ overall, monthStats, qEvents }) {
             </div>
           </div>
         )}
-      </div>
+      </ExportCard>
     </div>
   );
 }
@@ -3817,8 +3832,14 @@ function Top3Card({ r, rank, cat, overall, growthSort }) {
   const insights = profileInsights(prof, overall);
   const medal = ["#B08968", "#9C9C9C", "#A9765A"][rank];
   const best = prof.bestFormat;
+  const cardRef = useRef(null);
+  const catLabel = Q_CATS.find((c) => c.key === cat)?.label || "";
   return (
-    <div style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 12, borderTop: `3px solid ${medal}` }}>
+    <div ref={cardRef} style={{ ...styles.card, display: "flex", flexDirection: "column", gap: 12, borderTop: `3px solid ${medal}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: -4 }}>
+        <span style={{ fontSize: 11.5, color: "#A6A096" }}>{catLabel}・第 {rank + 1} 名</span>
+        <DownloadImgButton targetRef={cardRef} name={`${catLabel}_第${rank + 1}名_${r.page.name}`} />
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ width: 30, height: 30, borderRadius: 15, background: medal, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif" }}>{rank + 1}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -3890,12 +3911,18 @@ function Top3Compare({ growthRows, avgRows, rateRows, overall, growthSort }) {
             </button>
           ))}
         </div>
-        <FormatLegend />
       </div>
       {list.length === 0 ? <div style={styles.card}><EmptyState text="此類別沒有符合條件的經銷商。" /></div> : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
-          {list.map((r, i) => <Top3Card key={r.page.id} r={r} rank={i} cat={cat} overall={overall} growthSort={growthSort} />)}
-        </div>
+        <ExportBlock name={`${Q_CATS.find((c) => c.key === cat)?.label}_前三名比較`}
+          toolbar={<span style={{ fontSize: 12, color: "#A6A096" }}>每張卡片右上角可單獨下載，或</span>}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 16, color: "#33312C" }}>{Q_CATS.find((c) => c.key === cat)?.label} · 前三名</div>
+            <FormatLegend />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
+            {list.map((r, i) => <Top3Card key={r.page.id} r={r} rank={i} cat={cat} overall={overall} growthSort={growthSort} />)}
+          </div>
+        </ExportBlock>
       )}
       <div style={{ fontSize: 12, color: "#A6A096" }}>「數據觀察」是系統依數字自動整理的事實；成功原因的判讀與下季建議，請用下方 AI 提示詞產生。</div>
     </>
@@ -4336,13 +4363,11 @@ function QuarterTrendCards({ monthMix }) {
   const note = (txt, v) => multi && <div style={{ fontSize: 11.5, color: "#A6A096", marginTop: -10, marginBottom: 12 }}>{txt}{fmtPP(v)}</div>;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 14 }}>
-      <div style={styles.card}>
-        <div style={styles.infoTitle}>① 發文總數變化</div>
+      <ExportCard name="發文總數變化" title={<>① 發文總數變化</>}>
         <div style={styles.infoHeadline}>{postHead}</div>
         <PostCountColumns months={monthMix} />
-      </div>
-      <div style={styles.card}>
-        <div style={styles.infoTitle}>② 影音 vs 靜態貼文 <span style={{ fontWeight: 400, color: "#A6A096" }}>（影音＝影片＋Reels＋直播）</span></div>
+      </ExportCard>
+      <ExportCard name="影音vs靜態" title={<>② 影音 vs 靜態貼文 <span style={{ fontWeight: 400, color: "#A6A096" }}>（影音＝影片＋Reels＋直播）</span></>}>
         <div style={styles.infoHeadline}>{avHead}</div>
         {note("影音比例變化 ", ch("av"))}
         <StackMonthColumns months={monthMix} parts={[
@@ -4350,9 +4375,8 @@ function QuarterTrendCards({ monthMix }) {
           { key: "av", label: "影音", color: MIX_COLORS.av },
           { key: "other", label: "其他", color: MIX_COLORS.other },
         ]} />
-      </div>
-      <div style={styles.card}>
-        <div style={styles.infoTitle}>③ 自製・轉發・AI 比例</div>
+      </ExportCard>
+      <ExportCard name="自製轉發AI比例" title={<>③ 自製・轉發・AI 比例</>}>
         <div style={styles.infoHeadline}>{srcHead}</div>
         {note("自製比例變化 ", ch("own"))}
         <StackMonthColumns months={monthMix} parts={[
@@ -4360,7 +4384,7 @@ function QuarterTrendCards({ monthMix }) {
           { key: "repost", label: "轉發", color: MIX_COLORS.repost },
           { key: "ai", label: "AI", color: MIX_COLORS.ai },
         ]} />
-      </div>
+      </ExportCard>
     </div>
   );
 }
@@ -4444,6 +4468,7 @@ function DealerMonthTable({ rows, qMonths }) {
   };
 
   const TABS = [["posts", "① 發文數"], ["av", "② 影音 vs 靜態"], ["src", "③ 自製・AI 比例"]];
+  const tableRef = useRef(null);
   const sumLabel = tab === "posts" ? "季合計" : tab === "av" ? "季影音比例" : "季 自製／AI";
   const chLabel = tab === "posts" ? "首月→末月" : "首月→末月（百分點）";
 
@@ -4457,9 +4482,11 @@ function DealerMonthTable({ rows, qMonths }) {
           <span style={{ fontSize: 12, color: "#9C9684" }}>排序</span>
           <button style={{ ...styles.chipBtn, ...(sortBy === "total" ? styles.chipBtnActive : {}) }} onClick={() => setSortBy("total")}>{tab === "posts" ? "依季合計" : "依季比例"}</button>
           <button style={{ ...styles.chipBtn, ...(sortBy === "change" ? styles.chipBtnActive : {}) }} onClick={() => setSortBy("change")}>依變化（成長最多在前）</button>
+          <DownloadImgButton targetRef={tableRef} name={`各店每月變化_${TABS.find(([k]) => k === tab)[1].slice(2)}${expanded ? "_全部" : "_前10"}`} />
         </div>
       </div>
-      <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+      <div ref={tableRef} style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+        <div data-exportonly="1" style={{ display: "none", padding: "0 0 8px", fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 15 }}>各經銷商每月變化・{TABS.find(([k]) => k === tab)[1].slice(2)}</div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ ...styles.table, minWidth: 640 + qMonths.length * 90 }}>
             <thead>
@@ -4485,7 +4512,7 @@ function DealerMonthTable({ rows, qMonths }) {
           </table>
         </div>
         {sorted.length > TOP && (
-          <button onClick={() => setExpanded((v) => !v)} style={styles.expandBar}>
+          <button data-noexport="1" onClick={() => setExpanded((v) => !v)} style={styles.expandBar}>
             {expanded ? `▲ 收合（只顯示前 ${TOP} 家）` : `▼ 展開全部（還有 ${sorted.length - TOP} 家，共 ${sorted.length} 家）`}
           </button>
         )}
@@ -4494,6 +4521,261 @@ function DealerMonthTable({ rows, qMonths }) {
         「首月→末月」比較該店有參賽的第一個與最後一個月份；比例類只比較有發文的月份。「未參賽」月份不計入。
       </div>
     </>
+  );
+}
+
+/* ============================================================ Export any HTML chart card as PNG (html2canvas) ============================================================ */
+const ExportNameCtx = React.createContext({ prefix: "", caption: "" });
+
+async function downloadNodeAsPng(node, filename, caption) {
+  if (!window.html2canvas) { alert("圖片下載元件尚未載入，請確認網路連線後重新整理頁面"); return; }
+  const canvas = await window.html2canvas(node, {
+    scale: 2,
+    backgroundColor: "#FBF9F4",
+    useCORS: true,
+    logging: false,
+    ignoreElements: (el) => el.dataset && el.dataset.noexport === "1",
+    onclone: (doc, cloned) => {
+      // show full width of horizontally-scrolling tables
+      cloned.querySelectorAll("*").forEach((el) => {
+        const cs = doc.defaultView.getComputedStyle(el);
+        if (cs.overflowX === "auto" || cs.overflowX === "scroll") { el.style.overflow = "visible"; el.style.width = "100%"; }
+      });
+      cloned.querySelectorAll("[data-exportonly='1']").forEach((el) => { el.style.display = "block"; });
+      cloned.style.width = "max-content";
+      cloned.style.minWidth = node.offsetWidth + "px";
+      const ccs = doc.defaultView.getComputedStyle(cloned);
+      const flush = parseFloat(ccs.paddingTop) < 4; // blocks / tables with no inner padding
+      if (flush) { cloned.style.padding = "20px 22px"; cloned.style.borderRadius = "16px"; cloned.style.background = "#FBF9F4"; }
+      if (caption) {
+        const cap = doc.createElement("div");
+        cap.textContent = caption;
+        cap.style.cssText = "font-size:11px;color:#A6A096;margin-bottom:10px;font-family:'Noto Sans TC',sans-serif;letter-spacing:.5px";
+        cloned.insertBefore(cap, cloned.firstChild);
+      }
+    },
+  });
+  const a = document.createElement("a");
+  a.href = canvas.toDataURL("image/png");
+  a.download = filename.replace(/[\\/:*?"<>|]/g, "_") + ".png";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function DownloadImgButton({ targetRef, name, style }) {
+  const { prefix, caption } = React.useContext(ExportNameCtx);
+  const [busy, setBusy] = useState(false);
+  return (
+    <button data-noexport="1" title="下載圖片（PNG）" disabled={busy}
+      onClick={async () => {
+        if (!targetRef.current) return;
+        setBusy(true);
+        try { await downloadNodeAsPng(targetRef.current, `${prefix ? prefix + "_" : ""}${name}`, caption); }
+        catch (e) { console.error(e); alert("圖片產生失敗，請稍後再試"); }
+        setBusy(false);
+      }}
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 10px", borderRadius: 8, border: "1px solid #DDD6C6",
+        background: "#fff", color: "#7A7568", fontSize: 12, cursor: busy ? "wait" : "pointer", fontFamily: "'Noto Sans TC', sans-serif", whiteSpace: "nowrap", ...style }}>
+      <Icon name="download" size={13} />{busy ? "產生中…" : "下載圖片"}
+    </button>
+  );
+}
+
+// Card whose header row = small title (left) + download button (right)
+function ExportCard({ name, title, style, children }) {
+  const ref = useRef(null);
+  return (
+    <div ref={ref} style={{ ...styles.card, ...style }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+        <div style={styles.infoTitle}>{title}</div>
+        <DownloadImgButton targetRef={ref} name={name} style={{ marginTop: -4 }} />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// Section-level download (captures a whole block such as the Top-3 grid)
+function ExportBlock({ name, children, toolbar }) {
+  const ref = useRef(null);
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, alignItems: "center", marginBottom: -6 }}>
+        {toolbar}
+        <DownloadImgButton targetRef={ref} name={name} />
+      </div>
+      <div ref={ref} style={{ display: "flex", flexDirection: "column", gap: 14 }}>{children}</div>
+    </>
+  );
+}
+
+/* ============================================================ Month report: A/B/C champions + group comparison charts ============================================================ */
+const GROUP_KEYS = ["A", "B", "C"];
+const MONTH_MIN_POSTS = 3;
+
+function computeMonthGroups({ pages, posts, fanRecords, groupRecords, month }) {
+  const mg = groupRecords[month] || {};
+  const monthPosts = posts.filter((p) => p.month === month);
+  return GROUP_KEYS.map((g) => {
+    const members = pages.filter((p) => mg[p.id] === g);
+    const dealers = members.map((page) => {
+      const pp = monthPosts.filter((p) => p.pageId === page.id);
+      const engs = pp.map(engagement);
+      const total = engs.reduce((a, b) => a + b, 0);
+      const fe = entriesInMonth(fanRecords, page.id, month);
+      const first = fe[0], last = fe[fe.length - 1];
+      const stars = pp.filter((p) => p.star);
+      return {
+        page, pp, n: pp.length, total, avg: pp.length ? total / pp.length : 0,
+        fanFirst: first?.count, fanLast: last?.count, diff: fe.length > 1 ? last.count - first.count : null,
+        starN: stars.length, starTotal: stars.reduce((s, p) => s + engagement(p), 0),
+        topPost: [...pp].sort((a, b) => engagement(b) - engagement(a))[0] || null,
+      };
+    });
+    const gp = dealers.flatMap((d) => d.pp);
+    const growthKing = [...dealers].filter((d) => d.diff != null).sort((a, b) => b.diff - a.diff)[0] || null;
+    let pool = dealers.filter((d) => d.n >= MONTH_MIN_POSTS), relaxed = false;
+    if (!pool.length) { pool = dealers.filter((d) => d.n > 0); relaxed = true; }
+    const engKing = [...pool].sort((a, b) => b.avg - a.avg)[0] || null;
+    const starDealers = dealers.filter((d) => d.starN > 0).sort((a, b) => b.starN - a.starN || b.starTotal - a.starTotal);
+    return {
+      g, dealers, members: members.length, active: dealers.filter((d) => d.n > 0).length,
+      ...mixOf(gp), total: gp.reduce((s, p) => s + engagement(p), 0),
+      fanGrowth: dealers.reduce((s, d) => s + (d.diff || 0), 0),
+      growthKing, engKing, engRelaxed: relaxed, starKing: starDealers[0] || null,
+      starTies: starDealers.filter((d) => starDealers[0] && d.starN === starDealers[0].starN),
+      starOthers: starDealers.filter((d) => starDealers[0] && d.starN !== starDealers[0].starN),
+      starPosts: gp.filter((p) => p.star).length,
+    };
+  });
+}
+
+function ChampRow({ icon, label, name, value, sub, page }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "26px 1fr", gap: 10, padding: "12px 0", borderTop: "1px solid #EEE9DF" }}>
+      <span style={{ width: 26, height: 26, borderRadius: 8, background: "#F3EFE7", color: "#8A7A60", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name={icon} size={14} /></span>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 11.5, color: "#A6A096" }}>{label}</div>
+        {name ? (
+          <>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: "'Noto Serif TC', serif", fontWeight: 700, fontSize: 16, color: "#33312C" }}>{page ? <PageNameCell page={page} /> : name}</span>
+              <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, color: "#008C7A" }}>{value}</span>
+            </div>
+            {sub && <div style={{ fontSize: 11.5, color: "#A6A096", marginTop: 2 }}>{sub}</div>}
+          </>
+        ) : <div style={{ fontSize: 13, color: "#C0B9AA" }}>從缺</div>}
+      </div>
+    </div>
+  );
+}
+
+function GroupChampCard({ G }) {
+  const ref = useRef(null);
+  const c = GROUP_COLORS[G.g], bg = GROUP_BGS[G.g];
+  return (
+    <div ref={ref} style={{ ...styles.card, borderTop: `4px solid ${c}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ width: 34, height: 34, borderRadius: 9, background: c, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16 }}>{G.g}</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{G.g} 組冠軍</div>
+            <div style={{ fontSize: 11.5, color: "#A6A096" }}>{G.members} 家・{G.n} 篇・互動 {G.total.toLocaleString()}</div>
+          </div>
+        </div>
+        <DownloadImgButton targetRef={ref} name={`${G.g}組冠軍`} />
+      </div>
+      <ChampRow icon="users" label="粉絲成長王" page={G.growthKing?.page} name={G.growthKing?.page.name}
+        value={G.growthKing ? `${G.growthKing.diff >= 0 ? "+" : ""}${G.growthKing.diff.toLocaleString()} 人` : ""}
+        sub={G.growthKing ? `${G.growthKing.fanFirst.toLocaleString()} → ${G.growthKing.fanLast.toLocaleString()} 人` : ""} />
+      <ChampRow icon="heart" label={`貼文互動王（篇均互動數${G.engRelaxed ? "，本組無人達 3 篇" : `，至少 ${MONTH_MIN_POSTS} 篇`}）`} page={G.engKing?.page} name={G.engKing?.page.name}
+        value={G.engKing ? `${fmtNum(G.engKing.avg, 1)} / 篇` : ""}
+        sub={G.engKing ? `${G.engKing.n} 篇・總互動 ${G.engKing.total.toLocaleString()}${G.engKing.topPost ? `・最高單篇 ${engagement(G.engKing.topPost).toLocaleString()}` : ""}` : ""} />
+      <ChampRow icon="spark" label={`⭐ 點子王（獲選篇數最多${G.starTies.length > 1 ? "・並列" : ""}）`}
+        page={G.starTies.length === 1 ? G.starKing.page : null}
+        name={G.starKing ? G.starTies.map((d) => d.page.name).join("、") : null}
+        value={G.starKing ? `${G.starTies.length > 1 ? "各 " : ""}${G.starKing.starN} 篇` : ""}
+        sub={G.starKing ? `點子王貼文互動：${G.starTies.map((d) => (G.starTies.length > 1 ? `${d.page.name} ` : "") + d.starTotal.toLocaleString()).join("、")}${G.starOthers.length ? `｜另有：${G.starOthers.map((d) => `${d.page.name}×${d.starN}`).join("、")}` : ""}` : ""} />
+    </div>
+  );
+}
+
+function GroupStackRows({ groups, parts }) {
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11.5, color: "#5C5847", marginBottom: 12 }}>
+        {parts.map(([k, l, c]) => <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: c }} />{l}</span>)}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {groups.map((G) => (
+          <div key={G.g} style={{ display: "grid", gridTemplateColumns: "44px 1fr 56px", gap: 10, alignItems: "center" }}>
+            <span style={{ fontWeight: 700, color: GROUP_COLORS[G.g], fontSize: 13 }}>{G.g} 組</span>
+            <div style={{ display: "flex", gap: 2, height: 26, borderRadius: 5, overflow: "hidden", background: G.n ? "transparent" : "#F0EDE6" }}>
+              {G.n > 0 && parts.filter(([k]) => G[k] > 0).map(([k, l, c]) => {
+                const pct = pctOf(G[k], G.n);
+                return (
+                  <div key={k} title={`${G.g} 組｜${l} ${G[k]} 篇（${pct.toFixed(1)}%）`}
+                    style={{ flex: G[k], background: c, color: "#fff", fontSize: 11, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap", overflow: "hidden" }}>
+                    {pct >= 10 ? `${G[k]}・${Math.round(pct)}%` : ""}
+                  </div>
+                );
+              })}
+            </div>
+            <span style={{ fontSize: 11.5, color: "#A6A096", textAlign: "right", fontFamily: "'Space Grotesk', sans-serif" }}>{G.n} 篇</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MonthHighlights({ pages, posts, fanRecords, groupRecords, month }) {
+  const groups = useMemo(() => computeMonthGroups({ pages, posts, fanRecords, groupRecords, month }), [pages, posts, fanRecords, groupRecords, month]);
+  const live = groups.filter((G) => G.members > 0);
+  const blockRef = useRef(null);
+  if (!live.length) return null;
+
+  const top = (key) => [...live].sort((a, b) => b[key] - a[key])[0];
+  const postTop = top("n"), engTop = top("total");
+  const perDealer = (G, key) => (G.active ? G[key] / G.active : 0);
+  const avTop = [...live].filter((G) => G.n).sort((a, b) => pctOf(b.av, b.n) - pctOf(a.av, a.n))[0];
+  const aiTop = [...live].filter((G) => G.n).sort((a, b) => pctOf(b.ai, b.n) - pctOf(a.ai, a.n))[0];
+
+  return (
+    <ExportNameCtx.Provider value={{ prefix: `月報_${month}`, caption: `Honda 粉絲團監測站｜${monthLabel(month)}` }}>
+      <Anchor id="m-champs" />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <SectionTitle icon="crown" title="月度各組冠軍（粉絲成長王・貼文互動王・點子王）" />
+        <DownloadImgButton targetRef={blockRef} name="ABC組冠軍" />
+      </div>
+      <div ref={blockRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 14 }}>
+        {live.map((G) => <GroupChampCard key={G.g} G={G} />)}
+      </div>
+
+      <Anchor id="m-charts" />
+      <SectionTitle icon="chart" title="月度重點圖表（A／B／C 組比較）" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 14 }}>
+        <ExportCard name="各組發文總數" title="各組發文總數">
+          <div style={styles.infoHeadline}>{postTop.g} 組發文最多，共 {postTop.n} 篇</div>
+          <HBarList valueFmt={(v) => fmtNum(v, 0)} unitLabel=" 篇" items={live.map((G) => ({
+            label: `${G.g} 組`, value: G.n, color: GROUP_COLORS[G.g], sub: `${G.active} 家・每家 ${fmtNum(perDealer(G, "n"), 1)}`,
+          }))} />
+        </ExportCard>
+        <ExportCard name="各組互動總數" title="各組互動總數（讚＋留言＋分享）">
+          <div style={styles.infoHeadline}>{engTop.g} 組互動最多，共 {engTop.total.toLocaleString()}</div>
+          <HBarList valueFmt={(v) => fmtNum(v, 0)} items={live.map((G) => ({
+            label: `${G.g} 組`, value: G.total, color: GROUP_COLORS[G.g], sub: `篇均 ${fmtNum(G.n ? G.total / G.n : 0, 1)}`,
+          }))} />
+        </ExportCard>
+        <ExportCard name="各組影音vs靜態" title="各組影音 vs 靜態（影音＝影片＋Reels＋直播）">
+          <div style={styles.infoHeadline}>{avTop ? `${avTop.g} 組影音比例最高（${fmtPct(pctOf(avTop.av, avTop.n))}）` : "本月無貼文"}</div>
+          <GroupStackRows groups={live} parts={[["still", "靜態（圖片）", MIX_COLORS.still], ["av", "影音", MIX_COLORS.av], ["other", "其他", MIX_COLORS.other]]} />
+        </ExportCard>
+        <ExportCard name="各組自製轉發AI" title="各組自製・轉發・AI">
+          <div style={styles.infoHeadline}>{aiTop && aiTop.ai > 0 ? `${aiTop.g} 組 AI 比例最高（${fmtPct(pctOf(aiTop.ai, aiTop.n))}）` : `各組自製比例：${live.map((G) => `${G.g} ${fmtPct(pctOf(G.own, G.n))}`).join("、")}`}</div>
+          <GroupStackRows groups={live} parts={[["own", "自製", MIX_COLORS.own], ["repost", "轉發", MIX_COLORS.repost], ["ai", "AI", MIX_COLORS.ai]]} />
+        </ExportCard>
+      </div>
+    </ExportNameCtx.Provider>
   );
 }
 
