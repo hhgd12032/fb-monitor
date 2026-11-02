@@ -99,7 +99,7 @@ const POST_FORMATS = [
   { value: "other", label: "其他" },
 ];
 
-const POST_CONTENT_TAGS = ["公告", "促銷", "交車", "小知識", "創意", "新車宣傳", "其他"];
+const POST_CONTENT_TAGS = ["公告", "促銷", "交車", "小知識", "創意", "新車宣傳", "抽獎", "活動紀錄", "經銷商日常", "其他"];
 
 function nowMonth() {
   const d = new Date();
@@ -365,6 +365,7 @@ function App() {
             saveFanRecords={saveFanRecords}
             events={events}
             saveEvents={saveEvents}
+            groupRecords={groupRecords}
             month={month}
             setMonth={setMonth}
             showToast={showToast}
@@ -410,7 +411,18 @@ const fontImports = `
   ::-webkit-scrollbar-track { background: transparent; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
+  .fbm-inline-num { width: 100%; box-sizing: border-box; text-align: right; border: 1px solid transparent; background: transparent; border-radius: 6px;
+    padding: 4px 6px; font-family: 'Space Grotesk', sans-serif; font-size: 13.5px; color: #3A3A38; cursor: text; transition: background 0.12s, border-color 0.12s; }
+  .fbm-inline-num::placeholder { color: #D0CAC0; }
+  .fbm-inline-num:hover { background: #fff; border-color: #DDD6C6; }
+  .fbm-inline-num:focus { background: #fff; border-color: #8A9A8E; outline: none; box-shadow: 0 0 0 2px rgba(138,154,142,0.25); }
+  .fbm-inline-ro { display: none; }
+  .fbm-ptl-row:hover { background: #F4F0E7 !important; }
   @media (max-width: 767px) {
+    .fbm-floatnav { left: 14px !important; }
+    .fbm-inline-num { display: none; }
+    .fbm-inline-ro { display: inline; }
+    .fbm-inline-hint { display: none; }
     .fbm-main { padding: 66px 18px 60px !important; }
     .fbm-form-grid { grid-template-columns: 1fr !important; }
     .fbm-form-grid > * { grid-column: span 1 !important; }
@@ -1212,7 +1224,7 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
 }
 
 /* ============================================================ Input view ============================================================ */
-function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events, saveEvents, month, setMonth, showToast }) {
+function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events, saveEvents, groupRecords, month, setMonth, showToast }) {
   const [tab, setTab] = useState("posts"); // posts | fans | events
   const [selectedPageId, setSelectedPageId] = useState(pages[0]?.id || "");
   const [draft, setDraft] = useState({ url: "", views: "", likes: "", comments: "", shares: "", source: "original", format: "image", star: false, tags: [], date: "" });
@@ -1277,6 +1289,13 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events
   };
 
   const removePost = (id) => savePosts(posts.filter((p) => p.id !== id));
+
+  // Inline edit of 讚／留言／分享 directly in the list (desktop)
+  const FIELD_LABEL = { likes: "讚數", comments: "留言數", shares: "分享數" };
+  const updatePostField = (id, field, value) => {
+    savePosts(posts.map((p) => (p.id === id ? { ...p, [field]: value } : p)));
+    showToast(`已更新${FIELD_LABEL[field] || ""}`);
+  };
 
   const [pendingDeletePostId, setPendingDeletePostId] = useState(null);
   const requestDeletePost = (id) => setPendingDeletePostId(id);
@@ -1615,9 +1634,16 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events
             <div style={{ ...styles.hint, marginTop: 10 }}>按 Enter 可快速新增下一筆，粉絲團與類型設定會延續。互動數欄位全部選填——月中可以先只記錄貼文連結，等數字穩定後再回來用「編輯」補填。</div>
           </div>
 
+          {selectedPage && (
+            <PostTimeline pages={[selectedPage]} posts={posts} events={events} groupRecords={groupRecords} month={month}
+              title={`${selectedPage.name} · ${monthLabel(month)} 發文時間軸 ·`} />
+          )}
+
           <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
             <div style={styles.cardHeadRow}>
-              <span>{selectedPage?.name || "—"} · {monthLabel(month)} 已輸入 {monthPosts.length} 篇</span>
+              <span>{selectedPage?.name || "—"} · {monthLabel(month)} 已輸入 {monthPosts.length} 篇
+                <span className="fbm-inline-hint" style={{ marginLeft: 10, fontSize: 12, fontWeight: 400, color: "#A6A096" }}>讚／留言／分享可直接點數字修改，按 Enter 或點別處即儲存（Esc 取消）</span>
+              </span>
               {selectedPage?.url && (
                 <a href={selectedPage.url} target="_blank" rel="noreferrer" title={`開啟 ${selectedPage.name} 粉絲團頁面`}
                   style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 7, background: "#EBE6D9", color: "#8A9A8E", textDecoration: "none", fontSize: 12.5, fontWeight: 500 }}>
@@ -1635,11 +1661,11 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events
                     <th style={{ ...styles.th, width: 100 }}>日期</th>
                     <th style={{ ...styles.th, width: 72 }}>類型</th>
                     <th style={{ ...styles.th, width: 72 }}>形式</th>
-                    <th style={{ ...styles.th, width: 170 }}>內容</th>
+                    <th style={{ ...styles.th, width: 128 }}>內容</th>
                     <th style={{ ...styles.th, width: 60 }}>連結</th>
-                    <th style={{ ...styles.th, width: 58, textAlign: "right" }}>讚</th>
-                    <th style={{ ...styles.th, width: 58, textAlign: "right" }}>留言</th>
-                    <th style={{ ...styles.th, width: 58, textAlign: "right" }}>分享</th>
+                    <th style={{ ...styles.th, width: 78, textAlign: "right" }}>讚</th>
+                    <th style={{ ...styles.th, width: 78, textAlign: "right" }}>留言</th>
+                    <th style={{ ...styles.th, width: 78, textAlign: "right" }}>分享</th>
                     <th style={{ ...styles.th, width: 70, textAlign: "right" }}>觀看數<br /><span style={styles.thSubLabel}>僅供參考</span></th>
                     <th style={{ ...styles.th, width: 78, textAlign: "right" }}>互動總計<br /><span style={styles.thSubLabel}>讚+留言+分享</span></th>
                     <th style={{ ...styles.th, width: 32, textAlign: "center" }}>⭐</th>
@@ -1705,15 +1731,12 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events
                             <span style={{ color: "#A6A096" }}>—</span>
                           )}
                         </td>
-                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.likes ? "#3A3A38" : "#D0CAC0" }}>
-                          {p.likes ? p.likes.toLocaleString() : "—"}
-                        </td>
-                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.comments ? "#3A3A38" : "#D0CAC0" }}>
-                          {p.comments ? p.comments.toLocaleString() : "—"}
-                        </td>
-                        <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.shares ? "#3A3A38" : "#D0CAC0" }}>
-                          {p.shares ? p.shares.toLocaleString() : "—"}
-                        </td>
+                        {["likes", "comments", "shares"].map((f) => (
+                          <td key={f} style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p[f] ? "#3A3A38" : "#D0CAC0", padding: "6px 6px" }}>
+                            <InlineNum value={p[f]} label={FIELD_LABEL[f]} onCommit={(n) => updatePostField(p.id, f, n)} />
+                            <span className="fbm-inline-ro">{p[f] ? p[f].toLocaleString() : "—"}</span>
+                          </td>
+                        ))}
                         <td style={{ ...styles.td, textAlign: "right", fontFamily: "'Space Grotesk', sans-serif", color: p.views ? "#A18A4C" : "#D0CAC0", fontWeight: p.views ? 600 : 400 }}>
                           {p.views ? p.views.toLocaleString() : "—"}
                         </td>
@@ -1739,6 +1762,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events
               </div>
             )}
           </div>
+
         </>
       ) : (
         <>
@@ -1980,6 +2004,284 @@ function EventTimeline({ list, month, onPick }) {
   );
 }
 
+/* ============================================================ 貼文列表：直接點數字修改 ============================================================ */
+function InlineNum({ value, label, onCommit }) {
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState("");
+  const cancelRef = useRef(false);
+  const inputRef = useRef(null);
+  const justFocused = useRef(false);
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.select(); }, [editing]);
+  const shown = value ? Number(value).toLocaleString() : "";
+  const commit = () => {
+    setEditing(false);
+    if (cancelRef.current) { cancelRef.current = false; return; }
+    const n = v === "" ? 0 : Math.max(0, Math.round(Number(v) || 0));
+    if (n !== (Number(value) || 0)) onCommit(n);
+  };
+  return (
+    <input className="fbm-inline-num" type="text" inputMode="numeric" aria-label={label} title={`點擊直接修改${label || ""}`}
+      placeholder="—"
+      value={editing ? v : shown}
+      ref={inputRef}
+      onFocus={() => { justFocused.current = true; setEditing(true); setV(value ? String(value) : ""); }}
+      onMouseUp={(e) => { if (justFocused.current) { e.preventDefault(); justFocused.current = false; } }}
+      onChange={(e) => setV(e.target.value.replace(/[^\d]/g, ""))}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") { e.preventDefault(); e.target.blur(); }
+        else if (e.key === "Escape") { cancelRef.current = true; e.target.blur(); }
+      }} />
+  );
+}
+
+/* ============================================================ 本月發文時間軸（本月輸入 → 貼文互動數） ============================================================ */
+function PostTimeline({ pages, posts, events, groupRecords, month, selectedPageId, onPick, groupFilter = "", collapsible = false, title, sections = false }) {
+  const [open, setOpen] = useState(!collapsible);
+  const [openGroups, setOpenGroups] = useState({});
+  const wrapRef = useRef(null);
+  const shotRef = useRef(null);
+  const [wrapW, setWrapW] = useState(900);
+  useEffect(() => {
+    const el = wrapRef.current; if (!el) return;
+    const ro = new ResizeObserver(() => setWrapW(el.clientWidth));
+    ro.observe(el); setWrapW(el.clientWidth);
+    return () => ro.disconnect();
+  }, [open]);
+
+  const y = Number(month.slice(0, 4)), mo = Number(month.slice(5, 7));
+  const days = new Date(y, mo, 0).getDate();
+  const LABEL_W = 132, TOTAL_W = 46;
+  const dayW = Math.max((wrapW - LABEL_W - TOTAL_W - 2) / days, 26);
+  const gridW = dayW * days;
+  const ROW_H = 30, HEAD_H = 40;
+  const grp = (groupRecords && groupRecords[month]) || {};
+
+  const { rows, dayTotals, total } = useMemo(() => {
+    const mp = posts.filter((p) => p.month === month && p.date);
+    const byPage = {};
+    mp.forEach((p) => {
+      const d = Number(p.date.slice(8, 10));
+      if (!d || d > days) return;
+      ((byPage[p.pageId] = byPage[p.pageId] || {})[d] = (byPage[p.pageId][d] || [])).push(p);
+    });
+    const order = { A: 0, B: 1, C: 2 };
+    const rows = pages.filter((pg) => !groupFilter || (groupFilter === "-" ? !grp[pg.id] : grp[pg.id] === groupFilter)).map((pg, i) => ({ pg, i, g: grp[pg.id] || "", byDay: byPage[pg.id] || {} }))
+      .map((r) => ({ ...r, n: Object.values(r.byDay).reduce((s, a) => s + a.length, 0) }))
+      .sort((a, b) => (order[a.g] ?? 9) - (order[b.g] ?? 9) || a.i - b.i);
+    const dayTotals = Array(days).fill(0);
+    rows.forEach((r) => Object.entries(r.byDay).forEach(([d, a]) => { dayTotals[d - 1] += a.length; }));
+    return { rows, dayTotals, total: dayTotals.reduce((s, x) => s + x, 0) };
+  }, [pages, posts, month, days, grp, groupFilter]);
+
+  const groupLabel = groupFilter === "-" ? "未分組" : groupFilter ? `${groupFilter} 組` : "全體";
+  const sectionList = ["A", "B", "C", "-"].map((k) => ({ key: k, rows: rows.filter((r) => (k === "-" ? !r.g : r.g === k)) })).filter((x) => x.rows.length);
+  const busiest = rows.length ? rows.reduce((m, x) => (x.n > m.n ? x : m), rows[0]) : null;
+  const quiet = rows.filter((x) => x.n === 0);
+  const monthStart = `${month}-01`, monthEnd = `${month}-${String(days).padStart(2, "0")}`;
+  const mEvents = (events || []).filter((e) => e.start <= monthEnd && eventEnd(e) >= monthStart)
+    .sort((a, b) => a.start.localeCompare(b.start));
+  const dIdx = (date) => (date < monthStart ? 0 : date > monthEnd ? days - 1 : Number(date.slice(8, 10)) - 1);
+  // events packed into lanes so overlapping ones don't collide
+  const laneEnds = [];
+  const evPlaced = mEvents.map((e) => {
+    const s = dIdx(e.start), en = dIdx(eventEnd(e));
+    const left = Math.min(s * dayW + 2, gridW - 4);
+    const boxW = Math.min(Math.max((en - s + 1) * dayW - 4, textWidth(e.title, "500 11px 'Noto Sans TC', sans-serif") + 14), gridW - left - 2);
+    let lane = laneEnds.findIndex((end) => end <= left);
+    if (lane < 0) { lane = laneEnds.length; laneEnds.push(left + boxW + 3); } else laneEnds[lane] = left + boxW + 3;
+    return { e, left, boxW, lane };
+  });
+  const EV_LANE_H = 22;
+  const evH = evPlaced.length ? laneEnds.length * EV_LANE_H + 8 : 0;
+
+  const wdOf = (i) => new Date(y, mo - 1, i + 1).getDay();
+  const colBg = (i) => { const wd = wdOf(i); return wd === 0 || wd === 6 ? "#F1ECE2" : "transparent"; };
+  const colBorder = (i) => (wdOf(i) === 1 ? "1px solid #D8D0C0" : "1px solid #F0EBE1");
+  const maxDay = Math.max(1, ...dayTotals);
+  const stickyL = { position: "sticky", left: 0, zIndex: 2 };
+  const stickyR = { position: "sticky", right: 0, zIndex: 2 };
+
+  const dayCols = () => Array.from({ length: days }, (_, i) => (
+    <div key={i} style={{ position: "absolute", left: i * dayW, width: dayW, top: 0, bottom: 0, background: colBg(i), borderLeft: colBorder(i) }} />
+  ));
+
+  return (
+    <div ref={shotRef} style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
+      {collapsible && (
+        <button onClick={() => setOpen((v) => !v)}
+          style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "13px 18px", border: "none", background: open ? "#FBF9F4" : "#fff", flexWrap: "wrap",
+            borderBottom: open ? "1px solid #E6E1D6" : "none", cursor: "pointer", fontFamily: "'Noto Sans TC', sans-serif", textAlign: "left" }}>
+          <span style={{ fontSize: 12, color: "#A6A096", width: 12 }}>{open ? "▼" : "▶"}</span>
+          {GROUP_COLORS[groupFilter]
+            ? <span style={{ width: 24, height: 24, borderRadius: 6, background: GROUP_BGS[groupFilter], color: GROUP_COLORS[groupFilter], fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{groupFilter}</span>
+            : null}
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#3A3A38" }}>{groupLabel}</span>
+          <span style={{ fontSize: 12.5, color: "#7A7568" }}>{rows.length} 家 · 本月 <b style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#3A3A38" }}>{total}</b> 篇 · 平均每家 {rows.length ? (total / rows.length).toFixed(1) : 0} 篇</span>
+          {busiest && busiest.n > 0 && <span style={{ fontSize: 12, color: "#A6A096" }}>最多：{busiest.pg.name} {busiest.n} 篇{quiet.length ? `｜本月未發文：${quiet.map((x) => x.pg.name).join("、")}` : ""}</span>}
+          <span style={{ marginLeft: "auto", fontSize: 12, color: "#8A9A8E" }}>{open ? "收合" : "展開時間軸"}</span>
+        </button>
+      )}
+      {open && (<>
+      <div style={{ ...styles.cardHeadRow, flexWrap: "wrap", gap: 8 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>{title || `${monthLabel(month)} 發文時間軸 · ${groupLabel}`} {total} 篇
+          <DownloadImgButton targetRef={shotRef} name={`${month}_發文時間軸${title ? "_" + rows.map((x) => x.pg.name).join("") : groupFilter ? "_" + groupLabel : ""}`} /></span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 14, fontSize: 12, fontWeight: 400, color: "#7A7568", flexWrap: "wrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 5, background: "#3D6A63", opacity: 0.6 }} />1 篇
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 18, height: 18, borderRadius: 9, background: "#3D6A63", color: "#fff", fontSize: 11, fontWeight: 600, display: "inline-flex", alignItems: "center", justifyContent: "center", fontFamily: "'Space Grotesk', sans-serif" }}>3</span>同一天多篇（數字＝篇數）
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 5, background: "#3D6A63", opacity: 0.6, boxShadow: "0 0 0 2px #fff, 0 0 0 3.5px #D9A441" }} />含點子王
+          </span>
+          <span style={{ color: "#A6A096" }}>顏色＝競賽組別｜游標停在點上可看貼文明細{onPick ? "｜點選列可切換上方粉絲團" : ""}{sections ? "｜點組別列展開各經銷商（組別列數字＝當天該組篇數）" : ""}</span>
+        </span>
+      </div>
+      <div ref={wrapRef} style={{ overflowX: "auto" }}>
+        <div style={{ width: LABEL_W + gridW + TOTAL_W, minWidth: "100%", fontSize: 12 }}>
+          {/* header */}
+          <div style={{ display: "flex", height: HEAD_H, borderBottom: "1px solid #E6E1D6", background: "#FBF9F4" }}>
+            <div style={{ ...stickyL, width: LABEL_W, flex: "none", background: "#FBF9F4", display: "flex", alignItems: "center", paddingLeft: 14, color: "#A6A096", fontSize: 11.5, borderRight: "1px solid #E6E1D6" }}>粉絲團</div>
+            <div style={{ position: "relative", width: gridW, flex: "none" }}>
+              {Array.from({ length: days }, (_, i) => {
+                const wd = wdOf(i), weekend = wd === 0 || wd === 6;
+                return (
+                  <div key={i} style={{ position: "absolute", left: i * dayW, width: dayW, top: 0, bottom: 0, background: colBg(i), borderLeft: colBorder(i),
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", lineHeight: 1.25 }}>
+                    <span style={{ fontSize: 11.5, fontFamily: "'Space Grotesk', sans-serif", color: weekend ? "#B08968" : "#5C5847", fontWeight: wd === 1 ? 600 : 400 }}>{i + 1}</span>
+                    <span style={{ fontSize: 10, color: weekend ? "#B08968" : "#A6A096" }}>{WEEKDAYS[wd]}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ ...stickyR, width: TOTAL_W, flex: "none", background: "#FBF9F4", display: "flex", alignItems: "center", justifyContent: "center", color: "#A6A096", fontSize: 11.5, borderLeft: "1px solid #E6E1D6" }}>篇數</div>
+          </div>
+
+          {/* official events strip */}
+          {evPlaced.length > 0 && (
+            <div style={{ display: "flex", height: evH, borderBottom: "1px solid #E6E1D6" }}>
+              <div style={{ ...stickyL, width: LABEL_W, flex: "none", background: "#fff", display: "flex", alignItems: "center", paddingLeft: 14, color: "#7A7568", fontSize: 12, borderRight: "1px solid #E6E1D6" }}>官方活動</div>
+              <div style={{ position: "relative", width: gridW, flex: "none" }}>
+                {dayCols()}
+                {evPlaced.map(({ e, left, boxW, lane }) => {
+                  const t = eventType(e.type);
+                  return (
+                    <div key={e.id} title={`${e.title}｜${t.label}｜${e.start}${eventEnd(e) !== e.start ? " ~ " + eventEnd(e) : ""}${e.note ? "｜" + e.note : ""}`}
+                      style={{ position: "absolute", left, width: boxW, top: 5 + lane * EV_LANE_H, height: 17, borderRadius: 5,
+                        background: t.color, color: "#fff", fontSize: 11, lineHeight: "17px", padding: "0 6px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", boxSizing: "border-box" }}>
+                      {e.title}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ ...stickyR, width: TOTAL_W, flex: "none", background: "#fff", borderLeft: "1px solid #E6E1D6" }} />
+            </div>
+          )}
+
+          {/* page rows (optionally grouped into collapsible A/B/C sections sharing the date header) */}
+          {(sections ? sectionList : [{ key: "", rows }]).map((sec) => (
+            <React.Fragment key={sec.key || "all"}>
+              {sections && (() => {
+                const isOpen = !!openGroups[sec.key];
+                const gT = Array(days).fill(0);
+                sec.rows.forEach((r) => Object.entries(r.byDay).forEach(([d, a]) => { gT[d - 1] += a.length; }));
+                const gTotal = gT.reduce((a, b) => a + b, 0);
+                const busy = sec.rows.reduce((m, x) => (x.n > m.n ? x : m), sec.rows[0]);
+                const idle = sec.rows.filter((x) => x.n === 0);
+                const label = sec.key === "-" ? "未分組" : `${sec.key} 組`;
+                const tip = `${label}｜${sec.rows.length} 家・本月 ${gTotal} 篇・平均每家 ${(gTotal / sec.rows.length).toFixed(1)} 篇${busy && busy.n ? `｜最多：${busy.pg.name} ${busy.n} 篇` : ""}${idle.length ? `｜本月未發文：${idle.map((x) => x.pg.name).join("、")}` : ""}`;
+                const hb = isOpen ? "#F3F0EA" : "#FBF9F4";
+                return (
+                  <div title={tip + (isOpen ? "（點擊收合）" : "（點擊展開各經銷商）")} onClick={() => setOpenGroups((o) => ({ ...o, [sec.key]: !o[sec.key] }))}
+                    style={{ display: "flex", height: 36, borderBottom: "1px solid #E6E1D6", borderTop: "1px solid #E6E1D6", cursor: "pointer", background: hb }}>
+                    <div style={{ ...stickyL, width: LABEL_W, flex: "none", background: hb, display: "flex", alignItems: "center", gap: 7, paddingLeft: 10, borderRight: "1px solid #E6E1D6" }}>
+                      <span style={{ fontSize: 10, color: "#8C8674", width: 10 }}>{isOpen ? "▼" : "▶"}</span>
+                      {GROUP_COLORS[sec.key]
+                        ? <span style={{ width: 20, height: 20, borderRadius: 5, background: GROUP_COLORS[sec.key], color: "#fff", fontSize: 11, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{sec.key}</span>
+                        : null}
+                      <span style={{ fontWeight: 600, color: "#3A3A38", whiteSpace: "nowrap" }}>{label}</span>
+                      <span style={{ fontSize: 11, color: "#A6A096", whiteSpace: "nowrap" }}>{sec.rows.length} 家</span>
+                    </div>
+                    <div style={{ position: "relative", width: gridW, flex: "none" }}>
+                      {dayCols()}
+                      {gT.map((t, i) => t > 0 && (
+                        <div key={i} style={{ position: "absolute", left: i * dayW, width: dayW, top: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          <span style={{ minWidth: 18, height: 18, padding: "0 4px", boxSizing: "border-box", borderRadius: 9, background: GROUP_BGS[sec.key] || "#EBE6D9",
+                            color: GROUP_COLORS[sec.key] || "#7A7568", fontSize: 10.5, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{t}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ ...stickyR, width: TOTAL_W, flex: "none", background: hb, display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid #E6E1D6",
+                      fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, color: GROUP_COLORS[sec.key] || "#3A3A38" }}>{gTotal}</div>
+                  </div>
+                );
+              })()}
+          {(!sections || openGroups[sec.key]) && sec.rows.map(({ pg, g, byDay, n }) => {
+            const sel = pg.id === selectedPageId;
+            const rowBg = sel ? "#EBF0EE" : "#fff";
+            const dot = g ? GROUP_COLORS[g] : "#8A9A8E";
+            return (
+              <div key={pg.id} className="fbm-ptl-row" onClick={onPick ? () => onPick(pg.id) : undefined}
+                style={{ display: "flex", height: ROW_H, borderBottom: "1px solid #F0EBE1", cursor: onPick ? "pointer" : "default", background: rowBg }}>
+                <div style={{ ...stickyL, width: LABEL_W, flex: "none", background: rowBg, display: "flex", alignItems: "center", gap: 7, paddingLeft: sel ? 11 : 14,
+                  borderLeft: sel ? "3px solid #8A9A8E" : "none", borderRight: "1px solid #E6E1D6", overflow: "hidden" }}>
+                  {g && <span style={{ flex: "none", width: 18, height: 18, borderRadius: 5, background: GROUP_BGS[g], color: GROUP_COLORS[g], fontSize: 10.5, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{g}</span>}
+                  <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontWeight: sel ? 600 : 400, color: "#3A3A38" }}>{pg.name}</span>
+                </div>
+                <div style={{ position: "relative", width: gridW, flex: "none" }}>
+                  {dayCols()}
+                  {Object.entries(byDay).map(([d, list]) => {
+                    const c = list.length, star = list.some((p) => p.star);
+                    const size = c > 1 ? 19 : 10;
+                    const date = `${month}-${String(d).padStart(2, "0")}`;
+                    const tip = `${pg.name}｜${Number(mo)}/${d}（${WEEKDAYS[wdOf(d - 1)]}）｜${c} 篇\n` + list.map((p) => {
+                      const f = POST_FORMATS.find((x) => x.value === (p.format || p.type));
+                      const s = POST_SOURCES.find((x) => x.value === p.source);
+                      return `・${f ? f.label : "—"}／${s ? s.label : "—"}${(p.tags || []).length ? "／" + p.tags.join("、") : ""}${p.star ? " ⭐" : ""}｜互動 ${engagement(p).toLocaleString()}`;
+                    }).join("\n");
+                    return (
+                      <div key={d} title={tip} data-date={date}
+                        style={{ position: "absolute", left: (d - 1) * dayW + dayW / 2 - size / 2, top: ROW_H / 2 - size / 2, width: size, height: size, borderRadius: size / 2,
+                          background: dot, opacity: c > 1 ? 1 : 0.6, color: "#fff", fontSize: 11, fontWeight: 600, fontFamily: "'Space Grotesk', sans-serif",
+                          display: "flex", alignItems: "center", justifyContent: "center", boxShadow: star ? "0 0 0 2px #fff, 0 0 0 3.5px #D9A441" : "none" }}>
+                        {c > 1 ? c : ""}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ ...stickyR, width: TOTAL_W, flex: "none", background: rowBg, display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid #E6E1D6",
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, color: n ? "#3A3A38" : "#D0CAC0" }}>{n || "—"}</div>
+              </div>
+            );
+          })}
+            </React.Fragment>
+          ))}
+
+          {/* daily totals */}
+          {rows.length > 1 && <div style={{ display: "flex", height: 34, background: "#FBF9F4" }}>
+            <div style={{ ...stickyL, width: LABEL_W, flex: "none", background: "#FBF9F4", display: "flex", alignItems: "center", paddingLeft: 14, color: "#7A7568", fontSize: 12, fontWeight: 600, borderRight: "1px solid #E6E1D6" }}>每日合計</div>
+            <div style={{ position: "relative", width: gridW, flex: "none" }}>
+              {dayCols()}
+              {dayTotals.map((t, i) => t > 0 && (
+                <div key={i} title={`${Number(mo)}/${i + 1}（${WEEKDAYS[wdOf(i)]}）全體 ${t} 篇`}
+                  style={{ position: "absolute", left: i * dayW, width: dayW, top: 0, bottom: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", paddingBottom: 4, boxSizing: "border-box" }}>
+                  <div style={{ width: Math.min(dayW - 8, 14), height: Math.max(2, (t / maxDay) * 14), background: "#C9D3CD", borderRadius: 2, marginBottom: 2 }} />
+                  <span style={{ fontSize: 10.5, fontFamily: "'Space Grotesk', sans-serif", color: "#5C5847", lineHeight: 1 }}>{t}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ ...stickyR, width: TOTAL_W, flex: "none", background: "#FBF9F4", display: "flex", alignItems: "center", justifyContent: "center", borderLeft: "1px solid #E6E1D6",
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, color: "#3A3A38" }}>{total}</div>
+          </div>}
+        </div>
+      </div>
+      </>)}
+    </div>
+  );
+}
+
 function EventsPanel({ events, saveEvents, month, showToast }) {
   const blank = { title: "", type: "season", start: `${month}-01`, end: "", note: "" };
   const [draft, setDraft] = useState(blank);
@@ -2204,6 +2506,8 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
       .sort((a, b) => (b.diff ?? -Infinity) - (a.diff ?? -Infinity));
   }, [pages, fanRecords, month, monthGroups]);
 
+  const [fanExpanded, setFanExpanded] = useState(false);
+  const [distExpanded, setDistExpanded] = useState(false);
   // Fan growth filtered by active group
   const fanGrowthFiltered = useMemo(() =>
     activeGroup ? fanGrowth.filter((r) => r.group === activeGroup) : fanGrowth,
@@ -2250,7 +2554,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
         if (sourceCounts[src] != null) sourceCounts[src]++; else sourceCounts.original++;
       });
       return { page: p, total: pagePosts.length, tagCounts, untagged, sourceCounts, group: getGroup(p.id) };
-    }).filter((r) => r.total > 0);
+    }).filter((r) => r.total > 0).sort((a, b) => b.total - a.total);
   }, [pages, monthPosts, monthGroups]);
 
   /* ---------------- AI analysis prompt generator ---------------- */
@@ -2551,6 +2855,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
       <FloatNav topId="m-top" items={[
         { id: "m-champs", label: "各組冠軍", icon: "crown" },
         { id: "m-charts", label: "月度重點圖表", icon: "chart" },
+        { id: "m-timeline", label: "發文時間軸", icon: "calendar" },
         { id: "m-growth", label: "粉絲成長排名", icon: "users" },
         { id: "m-posts", label: "貼文互動排名", icon: "trend" },
         { id: "m-star", label: "點子王貼文", icon: "spark" },
@@ -2583,6 +2888,11 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
       </div>
 
       <MonthHighlights pages={pages} posts={posts} fanRecords={fanRecords} groupRecords={groupRecords} month={month} />
+
+      <Anchor id="m-timeline" />
+      <SectionTitle icon="calendar" title="本月發文時間軸" />
+      <PostTimeline pages={pages.filter((pg) => !pg.hidden || posts.some((p) => p.pageId === pg.id && p.month === month))}
+        posts={posts} events={events} groupRecords={groupRecords} month={month} sections />
 
       <Anchor id="m-growth" />
       <SectionTitle icon="users" title="粉絲人數成長排名 · 貼文互動排名" />
@@ -2635,7 +2945,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
               </tr>
             </thead>
             <tbody>
-              {fanGrowthFiltered.map((r, i) => {
+              {(fanExpanded ? fanGrowthFiltered : fanGrowthFiltered.slice(0, 5)).map((r, i) => {
                 const groupColors = { A: "#3D6A63", B: "#8A5E3C", C: "#5E4A7A" };
                 const groupBgs = { A: "#DDE5E2", B: "#EDE4D6", C: "#E2DDE8" };
                 const postCount = monthPosts.filter((p) => p.pageId === r.page.id).length;
@@ -2671,6 +2981,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
             </tbody>
           </table>
         )}
+        <MoreToggle expanded={fanExpanded} setExpanded={setFanExpanded} limit={5} total={fanGrowthFiltered.length} unit="家" />
       </div>
 
       <Anchor id="m-posts" />
@@ -2682,7 +2993,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
         {postsEngagedFiltered.length === 0 ? (
           <div style={{ padding: 20 }}><EmptyState text="這個組別本月還沒有貼文紀錄。" /></div>
         ) : (
-          <PostRankTable posts={postsEngagedFiltered} pageMap={pageMap} metric={engagement} metricLabel="互動總計" showGroup={activeGroup === "" && hasGroupData} getGroup={getGroup} collapsible />
+          <PostRankTable posts={postsEngagedFiltered} pageMap={pageMap} metric={engagement} metricLabel="互動總計" showGroup={activeGroup === "" && hasGroupData} getGroup={getGroup} collapsible limit={5} />
         )}
       </div>
 
@@ -2690,7 +3001,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
       <Anchor id="m-star" />
       <SectionTitle icon="spark" title={`⭐ 點子王貼文${activeGroup ? `（${activeGroup} 組）` : "（全體）"}`} />
       {starPostsFiltered.length > 0 ? (
-        <PostRankTable posts={starPostsFiltered} pageMap={pageMap} metric={engagement} metricLabel="互動總計" showGroup={activeGroup === "" && hasGroupData} getGroup={getGroup} collapsible />
+        <PostRankTable posts={starPostsFiltered} pageMap={pageMap} metric={engagement} metricLabel="互動總計" showGroup={activeGroup === "" && hasGroupData} getGroup={getGroup} collapsible limit={5} />
       ) : (
         <div style={{ ...styles.card, color: "#A6A096", fontSize: 13.5, padding: "14px 20px" }}>
           本月{activeGroup ? `${activeGroup} 組` : ""}尚無點子王貼文。
@@ -2701,7 +3012,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
       {activeGroup === "" && (
         <>
           <Anchor id="m-content" />
-          <SectionTitle icon="chart" title="各粉絲團貼文內容分佈" />
+          <SectionTitle icon="chart" title="各粉絲團貼文內容分佈（依篇數排序）" />
           <div style={{ ...styles.card, padding: 0, overflow: "hidden" }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ ...styles.table, tableLayout: "auto", minWidth: 700 }}>
@@ -2720,7 +3031,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
                   </tr>
                 </thead>
                 <tbody>
-                  {contentDist.map((r) => {
+                  {(distExpanded ? contentDist : contentDist.slice(0, 5)).map((r) => {
                     const groupColors = { A: "#3D6A63", B: "#8A5E3C", C: "#5E4A7A" };
                     const groupBgs = { A: "#DDE5E2", B: "#EDE4D6", C: "#E2DDE8" };
                     const sc = r.sourceCounts || {};
@@ -2759,11 +3070,12 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
                 </tbody>
               </table>
             </div>
+            <MoreToggle expanded={distExpanded} setExpanded={setDistExpanded} limit={5} total={contentDist.length} unit="家" />
           </div>
 
           <Anchor id="m-toplike" />
-          <SectionTitle icon="heart" title="本月最高讚貼文 TOP 10" />
-          <PostRankTable posts={topLiked} pageMap={pageMap} metric="likes" metricLabel="讚數" showGroup={hasGroupData} getGroup={getGroup} />
+          <SectionTitle icon="heart" title="本月最高讚貼文 TOP 10（前 5 名，其餘展開）" />
+          <PostRankTable posts={topLiked} pageMap={pageMap} metric="likes" metricLabel="讚數" showGroup={hasGroupData} getGroup={getGroup} collapsible limit={5} />
 
           <Anchor id="m-ai" />
           <SectionTitle icon="edit" title="AI 月報分析提示詞" />
@@ -2836,6 +3148,7 @@ function MonthReportView({ pages, posts, fanRecords, groupRecords, events, month
           </div>
         </>
       )}
+
     </div>
   );
 }
@@ -3607,12 +3920,12 @@ function FloatNav({ items, topId }) {
   const jump = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   if (!open) {
     return (
-      <button style={{ ...styles.floatNav, padding: 0, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#5C5847" }}
+      <button className="fbm-floatnav" style={{ ...styles.floatNav, padding: 0, width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#5C5847" }}
         onClick={() => setOpen(true)} title="展開區塊導覽"><Icon name="list" size={18} /></button>
     );
   }
   return (
-    <div style={styles.floatNav}>
+    <div className="fbm-floatnav" style={styles.floatNav}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 2px 2px 6px" }}>
         <span style={{ fontSize: 11, color: "#A6A096", letterSpacing: 1 }}>快速跳轉</span>
         <button style={{ ...styles.iconBtn, padding: 2 }} onClick={() => setOpen(false)} title="收合"><Icon name="x" size={13} /></button>
@@ -5003,7 +5316,18 @@ function PageNameCell({ page }) {
   );
 }
 
-function PostRankTable({ posts, pageMap, metric, metricLabel, showGroup, getGroup, collapsible }) {
+function MoreToggle({ expanded, setExpanded, limit, total, unit = "筆" }) {
+  if (total <= limit) return null;
+  return (
+    <button onClick={() => setExpanded((v) => !v)}
+      style={{ width: "100%", padding: "11px", border: "none", background: "#F3F0EA", borderTop: "1px solid #E6E1D6", cursor: "pointer", fontSize: 13,
+        color: "#7A7568", fontFamily: "'Noto Sans TC', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+      {expanded ? `▲ 收合（只顯示前 ${limit} 名）` : `▼ 展開全部（還有 ${total - limit} ${unit}，共 ${total} ${unit}）`}
+    </button>
+  );
+}
+
+function PostRankTable({ posts, pageMap, metric, metricLabel, showGroup, getGroup, collapsible, limit = 10 }) {
   const [expanded, setExpanded] = useState(false);
   const groupColors = { A: "#3D6A63", B: "#8A5E3C", C: "#5E4A7A" };
   const groupBgs = { A: "#DDE5E2", B: "#EDE4D6", C: "#E2DDE8" };
@@ -5016,7 +5340,7 @@ function PostRankTable({ posts, pageMap, metric, metricLabel, showGroup, getGrou
     );
   }
 
-  const COLLAPSE_THRESHOLD = 10;
+  const COLLAPSE_THRESHOLD = limit;
   const canCollapse = collapsible && posts.length > COLLAPSE_THRESHOLD;
   const visiblePosts = canCollapse && !expanded ? posts.slice(0, COLLAPSE_THRESHOLD) : posts;
   return (
@@ -5091,7 +5415,7 @@ function PostRankTable({ posts, pageMap, metric, metricLabel, showGroup, getGrou
           }}
         >
           {expanded
-            ? `▲ 收合（只顯示前 ${COLLAPSE_THRESHOLD} 筆）`
+            ? `▲ 收合（只顯示前 ${COLLAPSE_THRESHOLD} 名）`
             : `▼ 展開全部（還有 ${posts.length - COLLAPSE_THRESHOLD} 筆，共 ${posts.length} 篇）`}
         </button>
       )}
@@ -5855,6 +6179,9 @@ const TAG_COLORS = {
   "小知識": "#A18A4C",
   "創意":   "#9A8AA6",
   "新車宣傳":"#7B8F77",
+  "抽獎":   "#B86F6F",
+  "活動紀錄":"#6F8FA6",
+  "經銷商日常":"#9C7F5E",
   "其他":   "#C4B8A4",
   "未標記": "#DDD6C6",
 };
@@ -6574,7 +6901,7 @@ const styles = {
   miniLabel: { fontSize: 11, color: "#A6A096", marginBottom: 5 },
   miniStat: { background: "#F7F4EE", borderRadius: 10, padding: "8px 10px" },
   jumpBar: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  floatNav: { position: "fixed", right: 22, bottom: 22, zIndex: 60, display: "flex", flexDirection: "column", gap: 6, padding: 8, borderRadius: 14, background: "rgba(251,249,244,0.96)", border: "1px solid #E6E1D6", boxShadow: "0 6px 20px rgba(0,0,0,0.12)" },
+  floatNav: { position: "fixed", left: 16, bottom: 64, width: 208, boxSizing: "border-box", zIndex: 60, display: "flex", flexDirection: "column", gap: 6, padding: 8, borderRadius: 14, background: "rgba(251,249,244,0.96)", border: "1px solid #E6E1D6", boxShadow: "0 6px 20px rgba(0,0,0,0.12)" },
   jumpBtn: { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 13px", borderRadius: 999, border: "1px solid #DDD6C6", background: "#fff", color: "#5C5847", fontSize: 12.5, cursor: "pointer", fontFamily: "'Noto Sans TC', sans-serif" },
   segControl: { background: "#EBE6D9", borderRadius: 12, padding: 5, display: "flex", gap: 4 },
   segBtn: {
