@@ -549,11 +549,43 @@ function Sidebar({ view, setView, pageCount }) {
             </button>
           ))}
         </div>
+        <ThemeSwitch />
         <div style={styles.sidebarFoot}>
           資料存於雲端，所有人開啟同一個網址即可共用同一份資料。
         </div>
       </nav>
     </>
+  );
+}
+
+function ThemeSwitch() {
+  const cur = window.__fbmTheme || "orange";
+  const opts = [{ v: "classic", label: "原色", sw: ["#8A9A8F", "#F3F0EB"] }, { v: "orange", label: "橘色", sw: ["#FF6A14", "#111112"] }];
+  const pick = (v) => {
+    if (v === cur) return;
+    try { localStorage.setItem("fbm-theme", v); } catch (e) { alert("這個瀏覽器無法記住配色設定"); return; }
+    location.reload();
+  };
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.75, marginBottom: 6, paddingLeft: 4 }}>網站配色</div>
+      <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 10, background: "rgba(0,0,0,0.08)" }}>
+        {opts.map((o) => {
+          const on = o.v === cur;
+          return (
+            <button key={o.v} onClick={() => pick(o.v)} title={on ? "目前使用中" : `切換成${o.label}（頁面會重新載入）`}
+              style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "7px 6px", borderRadius: 7, border: "none", cursor: on ? "default" : "pointer",
+                fontFamily: "'Noto Sans TC', sans-serif", fontSize: 12.5, fontWeight: on ? 600 : 400, background: on ? "#FFFFFE" : "transparent", color: on ? "#222221" : "inherit",
+                boxShadow: on ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}>
+              <span style={{ display: "inline-flex" }}>
+                {o.sw.map((c, i) => <span key={i} style={{ width: 10, height: 10, borderRadius: 5, background: c, marginLeft: i ? -3 : 0, border: "1px solid rgba(0,0,0,0.15)" }} />)}
+              </span>
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -7031,6 +7063,16 @@ root.render(<App />);
   // the whole page (shows as blank with a "Cannot use import statement" console error).
   (function () {
     var source = document.getElementById("app-source").textContent;
+    // ---- 配色主題：classic（原色）／orange（橘白黑）。在編譯前替換色碼，切換後重新載入 ----
+    var theme = "orange"; // 預設橘色，可在左側選單切回原色
+    try { theme = localStorage.getItem("fbm-theme") || "orange"; } catch (e) {}
+    window.__fbmTheme = theme;
+    if (theme === "orange") {
+      var SIDE = [["background: \"#EBE6D9\",\n    borderRight: \"1px solid #DDD6C6\",\n    display: \"flex\",\n    flexDirection: \"column\",\n    padding: \"24px 18px\",", "background: \"#FF6A13\", color: \"#FFFFFF\",\n    borderRight: \"1px solid #FF6A13\",\n    display: \"flex\",\n    flexDirection: \"column\",\n    padding: \"24px 18px\","], ["brandSub: { fontSize: 11.5, color: \"#8C8674\",", "brandSub: { fontSize: 11.5, color: \"#FFE3D1\","], ["color: \"#5C5847\", fontSize: 14, cursor: \"pointer\", textAlign: \"left\",", "color: \"#FFF1E6\", fontSize: 14, cursor: \"pointer\", textAlign: \"left\","], ["navItemActive: { background: \"#F3F0EA\", color: \"#3A3A38\", fontWeight: 500, boxShadow: \"0 1px 2px rgba(0,0,0,0.06)\" },", "navItemActive: { background: \"#FFFFFF\", color: \"#111111\", fontWeight: 600, boxShadow: \"0 2px 8px rgba(0,0,0,0.15)\" },"], ["sidebarFoot: { marginTop: \"auto\", fontSize: 11.5, color: \"#A39D8A\",", "sidebarFoot: { marginTop: \"auto\", fontSize: 11.5, color: \"#FFD3B5\","], ["width: 34, height: 34, borderRadius: 9, background: \"#8A9A8E\", color: \"#F3F0EA\",", "width: 34, height: 34, borderRadius: 9, background: \"#111111\", color: \"#FFFFFF\","]];
+      SIDE.forEach(function (pair) { source = source.split(pair[0]).join(pair[1]); });
+      var MAP = {"#F3F0EA": "#F5F5F3", "#FBF9F4": "#FFFFFF", "#EBE6D9": "#EEEEEE", "#E6E1D6": "#E5E5E5", "#DDD6C6": "#D9D9D9", "#F0EDE6": "#F2F2F2", "#F7F4EE": "#F7F7F7", "#F0EBE1": "#EFEFEF", "#F1ECE2": "#FFF3EA", "#E8E4DC": "#E8E8E8", "#F5F4F1": "#F5F5F5", "#FBF5EC": "#FFF4EA", "#F4F0E7": "#FFF4EA", "#D8D0C0": "#CCCCCC", "#D8D2C4": "#D6D6D6", "#C9C2B4": "#C8C8C8", "#F0EDE8": "#F0F0F0", "#E8E5E0": "#E8E8E8", "#F8F6F2": "#F8F8F8", "#F7F5F2": "#F7F7F7", "#F6F3EE": "#F6F6F6", "#F5F3EE": "#F5F5F5", "#F5EDE3": "#FFF1E6", "#FFF8EC": "#FFF6EE", "#FBF1DE": "#FFF1E6", "#C9D3CD": "#FFC9A6", "#3A3A38": "#1A1A1A", "#33312C": "#111111", "#1E1E1C": "#111111", "#5C5847": "#3D3D3D", "#7A7568": "#5E5E5E", "#8C8674": "#7A7A7A", "#9C9684": "#8A8A8A", "#A6A096": "#9A9A9A", "#A39D8A": "#9A9A9A", "#B0A98F": "#ABABAB", "#B5AE9F": "#B0B0B0", "#D0CAC0": "#D0D0D0", "#C4B8A4": "#BDBDBD", "#8A9A8E": "#FF6A13", "#EBF0EE": "#FFF1E6", "#B08968": "#E0550B", "#3D6A63": "#FF6A13", "#DDE5E2": "#FFE6D5", "#8A5E3C": "#F5A300", "#EDE4D6": "#FFF0C2", "#5E4A7A": "#7A2E0E", "#E2DDE8": "#F6E2D8", "#5A4070": "#7A2E0E", "#7B8F77": "#1F8A4C", "#C08081": "#D23B2A", "#008C7A": "#FF6A13", "#B87420": "#F5A300", "#6A55A8": "#7A2E0E", "#C2456A": "#FFB37D", "#4A86C5": "#9A9A9A"};
+      source = source.replace(/#[0-9A-Fa-f]{6}\b/g, function (h) { return MAP[h.toUpperCase()] || h; });
+    }
     var output = Babel.transform(source, {
       presets: [["react", { runtime: "classic" }], "env"],
     }).code;
