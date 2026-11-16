@@ -99,7 +99,7 @@ const POST_FORMATS = [
   { value: "other", label: "其他" },
 ];
 
-const POST_CONTENT_TAGS = ["公告", "促銷", "交車", "小知識", "創意", "新車宣傳", "抽獎", "活動紀錄", "經銷商日常", "其他"];
+const POST_CONTENT_TAGS = ["公告", "促銷", "交車", "小知識", "創意", "新車宣傳", "抽獎", "活動紀錄", "業務日常", "其他"];
 
 function nowMonth() {
   const d = new Date();
@@ -310,6 +310,13 @@ function App() {
     setPosts(next);
     persistPosts(next);
   }, [persistPosts, setPosts]);
+
+  // 標籤更名：「經銷商日常」→「業務日常」（舊資料或匯入的備份自動轉換）
+  useEffect(() => {
+    if (!postsLoaded || !posts.some((p) => (p.tags || []).includes("經銷商日常"))) return;
+    savePosts(posts.map((p) => ((p.tags || []).includes("經銷商日常")
+      ? { ...p, tags: [...new Set(p.tags.map((t) => (t === "經銷商日常" ? "業務日常" : t)))] } : p)));
+  }, [postsLoaded, posts, savePosts]);
 
   const saveGroupRecords = useCallback((next) => {
     setGroupRecords(next);
@@ -560,7 +567,7 @@ function Sidebar({ view, setView, pageCount }) {
 
 function ThemeSwitch() {
   const cur = window.__fbmTheme || "orange";
-  const opts = [{ v: "classic", label: "原色", sw: ["#8A9A8F", "#F3F0EB"] }, { v: "orange", label: "橘色", sw: ["#FF6A14", "#111112"] }];
+  const opts = [{ v: "classic", label: "原色", sw: ["#8A9A8F", "#F3F0EB"] }, { v: "orange", label: "橘色", sw: ["#ED6F26", "#111112"] }];
   const pick = (v) => {
     if (v === cur) return;
     try { localStorage.setItem("fbm-theme", v); } catch (e) { alert("這個瀏覽器無法記住配色設定"); return; }
@@ -1256,6 +1263,37 @@ function PagesView({ pages, savePages, showToast, fanRecords, saveFanRecords, po
 }
 
 /* ============================================================ Input view ============================================================ */
+/* ============================================================ 日期輸入：點整個欄位就開日曆，並可前一天／後一天 ============================================================ */
+function openPicker(e) { try { if (e.currentTarget.showPicker) e.currentTarget.showPicker(); } catch (err) {} }
+function DateInput(props) {
+  return <input type="date" {...props} style={{ cursor: "pointer", ...(props.style || {}) }} onClick={(e) => { openPicker(e); props.onClick && props.onClick(e); }} />;
+}
+function shiftDate(ymd, d) {
+  if (!ymd) return ymd;
+  const [y, m, dd] = ymd.split("-").map(Number);
+  const t = new Date(y, m - 1, dd + d);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+function weekdayLabel(ymd) {
+  if (!ymd) return "";
+  const [y, m, d] = ymd.split("-").map(Number);
+  return "週" + ["日", "一", "二", "三", "四", "五", "六"][new Date(y, m - 1, d).getDay()];
+}
+function DateStepper({ value, onChange }) {
+  const btn = { flex: "none", width: 34, border: "1px solid #DDD6C6", background: "#fff", color: "#5C5847", cursor: "pointer",
+    display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontFamily: "'Space Grotesk', sans-serif" };
+  return (
+    <div style={{ display: "flex", alignItems: "stretch" }}>
+      <button type="button" title="前一天（Alt + ←）" onClick={() => onChange(shiftDate(value, -1))} style={{ ...btn, borderRadius: "8px 0 0 8px", borderRight: "none" }}>‹</button>
+      <DateInput style={{ ...styles.input, borderRadius: 0, flex: 1, minWidth: 0 }} value={value} onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) { e.preventDefault(); onChange(shiftDate(value, e.key === "ArrowLeft" ? -1 : 1)); }
+        }} />
+      <button type="button" title="後一天（Alt + →）" onClick={() => onChange(shiftDate(value, 1))} style={{ ...btn, borderRadius: "0 8px 8px 0", borderLeft: "none" }}>›</button>
+    </div>
+  );
+}
+
 function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events, saveEvents, groupRecords, month, setMonth, showToast }) {
   const [tab, setTab] = useState("posts"); // posts | fans | events
   const [selectedPageId, setSelectedPageId] = useState(pages[0]?.id || "");
@@ -1433,7 +1471,7 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events
               {/* Row 1: 日期 / 類型 / 形式 */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
                 <Field label="日期">
-                  <input type="date" style={styles.input} value={editDraft.date} onChange={(e) => setEditDraft({ ...editDraft, date: e.target.value })} />
+                  <DateInput style={styles.input} value={editDraft.date} onChange={(e) => setEditDraft({ ...editDraft, date: e.target.value })} />
                 </Field>
                 <Field label="類型">
                   <select style={styles.input} value={editDraft.source} onChange={(e) => setEditDraft({ ...editDraft, source: e.target.value })}>
@@ -1625,8 +1663,8 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events
         <>
           <div style={styles.card}>
             <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "1fr 1fr 1fr" }}>
-              <Field label="日期">
-                <input type="date" style={styles.input} value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+              <Field label={`日期${draft.date ? "・" + weekdayLabel(draft.date) : ""}`}>
+                <DateStepper value={draft.date} onChange={(v) => setDraft({ ...draft, date: v })} />
               </Field>
               <Field label="類型">
                 <select style={styles.input} value={draft.source} onChange={(e) => setDraft({ ...draft, source: e.target.value })}>
@@ -1876,8 +1914,8 @@ function InputView({ pages, posts, savePosts, fanRecords, saveFanRecords, events
         <>
           <div style={styles.card}>
             <div className="fbm-form-grid" style={{ ...styles.formGrid, gridTemplateColumns: "1fr 1fr 1fr" }}>
-              <Field label="量測日期">
-                <input type="date" style={styles.input} value={fanDate} onChange={(e) => setFanDate(e.target.value)} />
+              <Field label={`量測日期${fanDate ? "・" + weekdayLabel(fanDate) : ""}`}>
+                <DateStepper value={fanDate} onChange={setFanDate} />
               </Field>
               <Field label="粉絲人數">
                 <input
@@ -1992,10 +2030,10 @@ function EventFormFields({ draft, setDraft }) {
             onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
         </Field>
         <Field label="開始日期">
-          <input type="date" style={styles.input} value={draft.start} onChange={(e) => setDraft({ ...draft, start: e.target.value })} />
+          <DateInput style={styles.input} value={draft.start} onChange={(e) => setDraft({ ...draft, start: e.target.value })} />
         </Field>
         <Field label="結束日期（檔期才填）">
-          <input type="date" style={styles.input} value={draft.end} min={draft.start} onChange={(e) => setDraft({ ...draft, end: e.target.value })} />
+          <DateInput style={styles.input} value={draft.end} min={draft.start} onChange={(e) => setDraft({ ...draft, end: e.target.value })} />
         </Field>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 14, marginTop: 12, alignItems: "end" }}>
@@ -6276,7 +6314,7 @@ const TAG_COLORS = {
   "新車宣傳":"#7B8F77",
   "抽獎":   "#B86F6F",
   "活動紀錄":"#6F8FA6",
-  "經銷商日常":"#9C7F5E",
+  "業務日常":"#9C7F5E",
   "其他":   "#C4B8A4",
   "未標記": "#DDD6C6",
 };
@@ -7068,9 +7106,9 @@ root.render(<App />);
     try { theme = localStorage.getItem("fbm-theme") || "orange"; } catch (e) {}
     window.__fbmTheme = theme;
     if (theme === "orange") {
-      var SIDE = [["background: \"#EBE6D9\",\n    borderRight: \"1px solid #DDD6C6\",\n    display: \"flex\",\n    flexDirection: \"column\",\n    padding: \"24px 18px\",", "background: \"#FF6A13\", color: \"#FFFFFF\",\n    borderRight: \"1px solid #FF6A13\",\n    display: \"flex\",\n    flexDirection: \"column\",\n    padding: \"24px 18px\","], ["brandSub: { fontSize: 11.5, color: \"#8C8674\",", "brandSub: { fontSize: 11.5, color: \"#FFE3D1\","], ["color: \"#5C5847\", fontSize: 14, cursor: \"pointer\", textAlign: \"left\",", "color: \"#FFF1E6\", fontSize: 14, cursor: \"pointer\", textAlign: \"left\","], ["navItemActive: { background: \"#F3F0EA\", color: \"#3A3A38\", fontWeight: 500, boxShadow: \"0 1px 2px rgba(0,0,0,0.06)\" },", "navItemActive: { background: \"#FFFFFF\", color: \"#111111\", fontWeight: 600, boxShadow: \"0 2px 8px rgba(0,0,0,0.15)\" },"], ["sidebarFoot: { marginTop: \"auto\", fontSize: 11.5, color: \"#A39D8A\",", "sidebarFoot: { marginTop: \"auto\", fontSize: 11.5, color: \"#FFD3B5\","], ["width: 34, height: 34, borderRadius: 9, background: \"#8A9A8E\", color: \"#F3F0EA\",", "width: 34, height: 34, borderRadius: 9, background: \"#111111\", color: \"#FFFFFF\","]];
+      var SIDE = [["background: \"#EBE6D9\",\n    borderRight: \"1px solid #DDD6C6\",\n    display: \"flex\",\n    flexDirection: \"column\",\n    padding: \"24px 18px\",", "background: \"#ED6F25\", color: \"#FFFFFF\",\n    borderRight: \"1px solid #ED6F25\",\n    display: \"flex\",\n    flexDirection: \"column\",\n    padding: \"24px 18px\","], ["brandSub: { fontSize: 11.5, color: \"#8C8674\",", "brandSub: { fontSize: 11.5, color: \"#FCE4D4\","], ["color: \"#5C5847\", fontSize: 14, cursor: \"pointer\", textAlign: \"left\",", "color: \"#FDF1E8\", fontSize: 14, cursor: \"pointer\", textAlign: \"left\","], ["navItemActive: { background: \"#F3F0EA\", color: \"#3A3A38\", fontWeight: 500, boxShadow: \"0 1px 2px rgba(0,0,0,0.06)\" },", "navItemActive: { background: \"#FFFFFF\", color: \"#111111\", fontWeight: 600, boxShadow: \"0 2px 8px rgba(0,0,0,0.15)\" },"], ["sidebarFoot: { marginTop: \"auto\", fontSize: 11.5, color: \"#A39D8A\",", "sidebarFoot: { marginTop: \"auto\", fontSize: 11.5, color: \"#F9D4BB\","], ["width: 34, height: 34, borderRadius: 9, background: \"#8A9A8E\", color: \"#F3F0EA\",", "width: 34, height: 34, borderRadius: 9, background: \"#111111\", color: \"#FFFFFF\","]];
       SIDE.forEach(function (pair) { source = source.split(pair[0]).join(pair[1]); });
-      var MAP = {"#F3F0EA": "#F5F5F3", "#FBF9F4": "#FFFFFF", "#EBE6D9": "#EEEEEE", "#E6E1D6": "#E5E5E5", "#DDD6C6": "#D9D9D9", "#F0EDE6": "#F2F2F2", "#F7F4EE": "#F7F7F7", "#F0EBE1": "#EFEFEF", "#F1ECE2": "#FFF3EA", "#E8E4DC": "#E8E8E8", "#F5F4F1": "#F5F5F5", "#FBF5EC": "#FFF4EA", "#F4F0E7": "#FFF4EA", "#D8D0C0": "#CCCCCC", "#D8D2C4": "#D6D6D6", "#C9C2B4": "#C8C8C8", "#F0EDE8": "#F0F0F0", "#E8E5E0": "#E8E8E8", "#F8F6F2": "#F8F8F8", "#F7F5F2": "#F7F7F7", "#F6F3EE": "#F6F6F6", "#F5F3EE": "#F5F5F5", "#F5EDE3": "#FFF1E6", "#FFF8EC": "#FFF6EE", "#FBF1DE": "#FFF1E6", "#C9D3CD": "#FFC9A6", "#3A3A38": "#1A1A1A", "#33312C": "#111111", "#1E1E1C": "#111111", "#5C5847": "#3D3D3D", "#7A7568": "#5E5E5E", "#8C8674": "#7A7A7A", "#9C9684": "#8A8A8A", "#A6A096": "#9A9A9A", "#A39D8A": "#9A9A9A", "#B0A98F": "#ABABAB", "#B5AE9F": "#B0B0B0", "#D0CAC0": "#D0D0D0", "#C4B8A4": "#BDBDBD", "#8A9A8E": "#FF6A13", "#EBF0EE": "#FFF1E6", "#B08968": "#E0550B", "#3D6A63": "#FF6A13", "#DDE5E2": "#FFE6D5", "#8A5E3C": "#F5A300", "#EDE4D6": "#FFF0C2", "#5E4A7A": "#7A2E0E", "#E2DDE8": "#F6E2D8", "#5A4070": "#7A2E0E", "#7B8F77": "#1F8A4C", "#C08081": "#D23B2A", "#008C7A": "#FF6A13", "#B87420": "#F5A300", "#6A55A8": "#7A2E0E", "#C2456A": "#FFB37D", "#4A86C5": "#9A9A9A"};
+      var MAP = {"#F3F0EA": "#F5F5F3", "#FBF9F4": "#FFFFFF", "#EBE6D9": "#EEEEEE", "#E6E1D6": "#E5E5E5", "#DDD6C6": "#D9D9D9", "#F0EDE6": "#F2F2F2", "#F7F4EE": "#F7F7F7", "#F0EBE1": "#EFEFEF", "#F1ECE2": "#FDF3EC", "#E8E4DC": "#E8E8E8", "#F5F4F1": "#F5F5F5", "#FBF5EC": "#FDF4EC", "#F4F0E7": "#FDF4EC", "#D8D0C0": "#CCCCCC", "#D8D2C4": "#D6D6D6", "#C9C2B4": "#C8C8C8", "#F0EDE8": "#F0F0F0", "#E8E5E0": "#E8E8E8", "#F8F6F2": "#F8F8F8", "#F7F5F2": "#F7F7F7", "#F6F3EE": "#F6F6F6", "#F5F3EE": "#F5F5F5", "#F5EDE3": "#FDF1E8", "#FFF8EC": "#FEF6EF", "#FBF1DE": "#FDF1E8", "#C9D3CD": "#F8CAAD", "#3A3A38": "#1A1A1A", "#33312C": "#111111", "#1E1E1C": "#111111", "#5C5847": "#3D3D3D", "#7A7568": "#5E5E5E", "#8C8674": "#7A7A7A", "#9C9684": "#8A8A8A", "#A6A096": "#9A9A9A", "#A39D8A": "#9A9A9A", "#B0A98F": "#ABABAB", "#B5AE9F": "#B0B0B0", "#D0CAC0": "#D0D0D0", "#C4B8A4": "#BDBDBD", "#8A9A8E": "#ED6F25", "#EBF0EE": "#FDF1E8", "#B08968": "#D05A1B", "#3D6A63": "#ED6F25", "#DDE5E2": "#FCE7D8", "#8A5E3C": "#E39D12", "#EDE4D6": "#FAEEC7", "#5E4A7A": "#723116", "#E2DDE8": "#F4E3DA", "#5A4070": "#723116", "#7B8F77": "#1F8A4C", "#C08081": "#D23B2A", "#008C7A": "#ED6F25", "#B87420": "#E39D12", "#6A55A8": "#723116", "#C2456A": "#F5B587", "#4A86C5": "#9A9A9A"};
       source = source.replace(/#[0-9A-Fa-f]{6}\b/g, function (h) { return MAP[h.toUpperCase()] || h; });
     }
     var output = Babel.transform(source, {
